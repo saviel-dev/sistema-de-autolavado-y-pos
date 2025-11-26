@@ -66,18 +66,20 @@ const Customers = () => {
         </Button>
       </div>
 
-      <Card>
+      <Card className="shadow-lg hover:shadow-xl transition-shadow">
         <CardHeader>
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <IoPeopleOutline className="h-6 w-6 text-primary" />
+              <div className="bg-primary/10 p-2 rounded-lg">
+                <IoPeopleOutline className="h-6 w-6 text-primary" />
+              </div>
               Lista de Clientes
             </CardTitle>
             <div className="relative w-full md:w-64">
               <IoSearchOutline className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar cliente..."
-                className="pl-10"
+                className="pl-10 focus:ring-2 focus:ring-primary/20 transition-all"
               />
             </div>
           </div>
@@ -87,32 +89,32 @@ const Customers = () => {
             {customers.map((customer) => (
               <div
                 key={customer.id}
-                className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors gap-4"
+                className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10 hover:shadow-md transition-all duration-300 border border-border/50 gap-4"
               >
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-foreground">{customer.name}</p>
                     <Badge
                       variant={customer.status === "VIP" ? "default" : "secondary"}
-                      className={customer.status === "VIP" ? "bg-primary" : ""}
+                      className={`shadow-sm ${customer.status === "VIP" ? "bg-primary" : ""}`}
                     >
                       {customer.status}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">{customer.email}</p>
                   <p className="text-sm text-muted-foreground">{customer.phone}</p>
-                  <p className="text-sm font-medium text-foreground">{customer.vehicle}</p>
+                  <p className="text-sm font-semibold text-foreground">{customer.vehicle}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="text-center px-4 py-2 rounded-lg bg-muted">
-                    <p className="text-2xl font-bold text-primary">{customer.visits}</p>
-                    <p className="text-xs text-muted-foreground">Visitas</p>
+                  <div className="text-center px-5 py-3 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10 shadow-sm">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">{customer.visits}</p>
+                    <p className="text-xs text-muted-foreground font-medium mt-1">Visitas</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="hover:bg-primary/10">
+                    <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-all">
                       Ver Perfil
                     </Button>
-                    <Button variant="outline" size="sm" className="hover:bg-secondary/10">
+                    <Button variant="outline" size="sm" className="hover:bg-secondary hover:text-secondary-foreground transition-all">
                       Contactar
                     </Button>
                   </div>

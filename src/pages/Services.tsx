@@ -64,29 +64,29 @@ const Services = () => {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {services.map((service, index) => (
-          <Card key={index} className="hover:shadow-lg transition-shadow relative overflow-hidden">
+          <Card key={index} className="hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden border-t-4 border-t-primary">
             {service.popular && (
-              <Badge className="absolute top-4 right-4 bg-gradient-to-r from-primary to-secondary">
+              <Badge className="absolute top-4 right-4 bg-gradient-to-r from-primary to-secondary shadow-md">
                 Popular
               </Badge>
             )}
             <CardHeader>
               <div className="flex items-start justify-between">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10">
-                  <IoCarSportOutline className="h-6 w-6 text-primary" />
+                <div className="p-4 rounded-full bg-gradient-to-br from-primary/10 to-secondary/10">
+                  <IoCarSportOutline className="h-8 w-8 text-primary" />
                 </div>
               </div>
               <CardTitle className="mt-4">{service.name}</CardTitle>
-              <CardDescription>{service.description}</CardDescription>
+              <CardDescription className="leading-relaxed">{service.description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Duración</span>
-                <span className="font-medium">{service.duration}</span>
+              <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                <span className="text-sm font-medium text-muted-foreground">Duración</span>
+                <span className="font-semibold">{service.duration}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-2xl font-bold text-primary">{service.price}</span>
-                <Button variant="outline" size="sm" className="hover:bg-primary/10">
+                <span className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">{service.price}</span>
+                <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-all">
                   Editar
                 </Button>
               </div>

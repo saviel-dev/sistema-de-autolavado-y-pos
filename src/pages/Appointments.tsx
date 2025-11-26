@@ -65,10 +65,12 @@ const Appointments = () => {
         </Button>
       </div>
 
-      <Card>
+      <Card className="shadow-lg hover:shadow-xl transition-shadow">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <IoCalendarOutline className="h-6 w-6 text-primary" />
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <IoCalendarOutline className="h-6 w-6 text-primary" />
+            </div>
             Próximas Citas
           </CardTitle>
         </CardHeader>
@@ -77,31 +79,31 @@ const Appointments = () => {
             {appointments.map((appointment) => (
               <div
                 key={appointment.id}
-                className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors gap-4"
+                className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10 hover:shadow-md transition-all duration-300 border border-border/50 gap-4"
               >
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-foreground">{appointment.client}</p>
                     <Badge
                       variant={appointment.status === "Confirmada" ? "default" : "secondary"}
-                      className={appointment.status === "Confirmada" ? "bg-primary" : ""}
+                      className={`shadow-sm ${appointment.status === "Confirmada" ? "bg-primary" : ""}`}
                     >
                       {appointment.status}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">{appointment.service}</p>
-                  <p className="text-xs text-muted-foreground">{appointment.phone}</p>
+                  <p className="text-xs text-muted-foreground font-medium">{appointment.phone}</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-sm font-medium">{appointment.date}</p>
+                    <p className="text-sm font-semibold">{appointment.date}</p>
                     <p className="text-sm text-muted-foreground">{appointment.time}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="hover:bg-primary/10">
+                    <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-all">
                       Ver
                     </Button>
-                    <Button variant="outline" size="sm" className="hover:bg-destructive/10 hover:text-destructive">
+                    <Button variant="outline" size="sm" className="hover:bg-red-500 hover:text-white transition-all">
                       Cancelar
                     </Button>
                   </div>

@@ -52,42 +52,47 @@ const Dashboard = () => {
         {statsCards.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <Card key={stat.title} className="overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-l-4 border-l-primary">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.color}`}>
-                  <Icon className="h-5 w-5 text-white" />
+                <div className={`p-3 rounded-full bg-gradient-to-br ${stat.color}`}>
+                  <Icon className="h-6 w-6 text-white" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stat.value}</div>
+                <div className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">{stat.value}</div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      <Card>
+      <Card className="shadow-lg hover:shadow-xl transition-shadow">
         <CardHeader>
-          <CardTitle>Actividad Reciente</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <IoCalendarOutline className="h-5 w-5 text-primary" />
+            </div>
+            Actividad Reciente
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {recentActivities.map((activity, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10 hover:shadow-md transition-all duration-300 border border-border/50"
               >
                 <div className="flex-1">
-                  <p className="font-medium text-foreground">{activity.client}</p>
+                  <p className="font-semibold text-foreground">{activity.client}</p>
                   <p className="text-sm text-muted-foreground">{activity.service}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground">{activity.time}</span>
+                  <span className="text-sm font-medium text-muted-foreground">{activity.time}</span>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold shadow-sm ${
                       activity.status === "Completado"
                         ? "bg-green-100 text-green-800"
                         : activity.status === "En Proceso"

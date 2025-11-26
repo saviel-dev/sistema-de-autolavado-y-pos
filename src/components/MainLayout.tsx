@@ -23,7 +23,7 @@ const MainLayout = () => {
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="gap-2 hover:bg-destructive/10 hover:text-destructive transition-colors"
+              className="gap-2 hover:bg-red-500 hover:text-white transition-all duration-300"
             >
               <IoLogOutOutline className="h-5 w-5" />
               Cerrar Sesión
