@@ -5,7 +5,10 @@ import {
   IoCalendarOutline, 
   IoPeopleOutline,
   IoCashOutline,
-  IoTrendingUpOutline
+  IoTrendingUpOutline,
+  IoCheckmarkCircle,
+  IoTime,
+  IoAlertCircle
 } from "react-icons/io5";
 
 interface DolarData {
@@ -13,30 +16,48 @@ interface DolarData {
   fechaActualizacion: string;
 }
 
-const statsCards = [
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-VE', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const getStatsCards = (dolarRate?: DolarData) => [
   {
     title: "Servicios Hoy",
     value: "12",
     icon: IoCarSportOutline,
-    color: "from-primary to-primary/80",
+    bgColor: "bg-blue-600",
+    iconColor: "text-blue-100"
   },
   {
-    title: "Citas Pendientes",
+    title: "Pedidos Pendientes",
     value: "8",
     icon: IoCalendarOutline,
-    color: "from-secondary to-secondary/80",
+    bgColor: "bg-green-600",
+    iconColor: "text-green-100"
   },
   {
-    title: "Clientes Activos",
-    value: "156",
-    icon: IoPeopleOutline,
-    color: "from-accent to-accent/80",
+    title: "Tasa BCV",
+    value: dolarRate ? `Bs. ${dolarRate.promedio.toFixed(2)}` : "Bs. 0.00",
+    icon: IoTrendingUpOutline,
+    bgColor: "bg-emerald-600",
+    iconColor: "text-emerald-100",
+    showBs: false,
+    isRate: true,
+    subtitle: dolarRate ? formatDate(dolarRate.fechaActualizacion) : ""
   },
   {
     title: "Ingresos del Día",
-    value: "Bs. 320",
+    value: "12.50",
     icon: IoCashOutline,
-    color: "from-primary to-secondary",
+    bgColor: "bg-amber-600",
+    iconColor: "text-amber-100",
+    showBs: true
   },
 ];
 
@@ -77,16 +98,6 @@ const Dashboard = () => {
     fetchDolarRate();
   }, []);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-VE', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -95,83 +106,92 @@ const Dashboard = () => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {statsCards.map((stat) => {
+        {getStatsCards(dolarData).map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-l-4 border-l-primary">
+            <Card key={stat.title} className={`overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${stat.bgColor} text-white`}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-sm font-medium text-white/90">
                   {stat.title}
                 </CardTitle>
-                <div className={`p-3 rounded-full bg-gradient-to-br ${stat.color}`}>
-                  <Icon className="h-6 w-6 text-white" />
+                <div className={`p-3 rounded-full bg-black/20`}>
+                  <Icon className={`h-6 w-6 ${stat.iconColor}`} />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">{stat.value}</div>
+                <div className="space-y-0.5">
+                  <div className="text-3xl font-bold text-white">
+                    {stat.isRate ? stat.value : (stat.showBs ? `$ ${stat.value}` : stat.value)}
+                  </div>
+                  {stat.subtitle && (
+                    <div className="text-xs text-white/80">
+                      {stat.subtitle}
+                    </div>
+                  )}
+                  {stat.showBs && dolarData && (
+                    <div className="text-sm text-white/90">
+                      Bs. {(parseFloat(stat.value) * dolarData.promedio).toFixed(2)}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Dollar Exchange Rate Card */}
-      <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-l-4 border-l-green-500">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Dólar Oficial (BCV)
-          </CardTitle>
-          <div className="p-3 rounded-full bg-gradient-to-br from-green-500 to-green-600">
-            <IoTrendingUpOutline className="h-6 w-6 text-white" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-2xl font-semibold text-muted-foreground">Cargando...</div>
-          ) : error ? (
-            <div className="text-xl font-semibold text-red-500">{error}</div>
-          ) : dolarData ? (
-            <>
-              <div className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                Bs. {dolarData.promedio.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Actualizado: {formatDate(dolarData.fechaActualizacion)}
-              </p>
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
+      {/* La tarjeta de la tasa del dólar ha sido movida al encabezado */}
 
-      <Card className="shadow-lg hover:shadow-xl transition-shadow">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="bg-primary/10 p-2 rounded-lg">
+      <Card className="shadow-lg hover:shadow-xl transition-all duration-300 border-0 overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 pb-2">
+          <CardTitle className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/10">
               <IoCalendarOutline className="h-5 w-5 text-primary" />
             </div>
-            Actividad Reciente
+            <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              Actividad Reciente
+            </span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-0">
+          <div className="divide-y divide-border/50">
             {recentActivities.map((activity, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10 hover:shadow-md transition-all duration-300 border border-border/50"
+                className="group flex items-center justify-between p-4 hover:bg-muted/30 transition-all duration-200 hover:pl-6"
               >
-                <div className="flex-1">
-                  <p className="font-semibold text-foreground">{activity.client}</p>
-                  <p className="text-sm text-muted-foreground">{activity.service}</p>
-                </div>
                 <div className="flex items-center gap-4">
+                  <div className={`p-2.5 rounded-lg ${
+                    activity.status === "Completado"
+                      ? "bg-green-100 text-green-600"
+                      : activity.status === "En Proceso"
+                      ? "bg-blue-100 text-blue-600"
+                      : "bg-amber-100 text-amber-600"
+                  }`}>
+                    {activity.status === "Completado" ? (
+                      <IoCheckmarkCircle className="h-5 w-5" />
+                    ) : activity.status === "En Proceso" ? (
+                      <IoTime className="h-5 w-5" />
+                    ) : (
+                      <IoAlertCircle className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground group-hover:text-primary transition-colors">
+                      {activity.client}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{activity.service}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end">
                   <span className="text-sm font-medium text-muted-foreground">{activity.time}</span>
                   <span
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold shadow-sm ${
+                    className={`mt-1 px-3 py-1 rounded-full text-xs font-medium ${
                       activity.status === "Completado"
-                        ? "bg-green-100 text-green-800"
+                        ? "bg-green-50 text-green-700 border border-green-100"
                         : activity.status === "En Proceso"
-                        ? "bg-blue-100 text-blue-800"
-                        : "bg-yellow-100 text-yellow-800"
+                        ? "bg-blue-50 text-blue-700 border border-blue-100"
+                        : "bg-amber-50 text-amber-700 border border-amber-100"
                     }`}
                   >
                     {activity.status}
