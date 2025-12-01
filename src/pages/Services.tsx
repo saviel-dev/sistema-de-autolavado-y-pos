@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion, Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IoAddOutline, IoCarSportOutline, IoTrashOutline, IoPencilOutline } from "react-icons/io5";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { IoAddOutline, IoTrashOutline, IoPencilOutline, IoCubeOutline } from "react-icons/io5";
 import {
   Dialog,
   DialogContent,
@@ -10,18 +14,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 interface Service {
   id: number;
   name: string;
   description: string;
-  duration: string;
   price: string;
   popular: boolean;
 }
@@ -31,7 +30,6 @@ const initialServices: Service[] = [
     id: 1,
     name: "Lavado Express",
     description: "Lavado exterior rápido y eficiente",
-    duration: "15 min",
     price: "5",
     popular: false,
   },
@@ -39,7 +37,6 @@ const initialServices: Service[] = [
     id: 2,
     name: "Lavado Completo",
     description: "Lavado exterior e interior profundo",
-    duration: "45 min",
     price: "10",
     popular: true,
   },
@@ -47,32 +44,7 @@ const initialServices: Service[] = [
     id: 3,
     name: "Encerado Premium",
     description: "Encerado profesional con cera de alta calidad",
-    duration: "60 min",
     price: "20",
-    popular: true,
-  },
-  {
-    id: 4,
-    name: "Pulido de Faros",
-    description: "Restauración y pulido de faros delanteros",
-    duration: "30 min",
-    price: "8",
-    popular: false,
-  },
-  {
-    id: 5,
-    name: "Limpieza de Motor",
-    description: "Limpieza profunda del compartimento del motor",
-    duration: "40 min",
-    price: "12",
-    popular: false,
-  },
-  {
-    id: 6,
-    name: "Detallado Completo",
-    description: "Servicio premium con todo incluido",
-    duration: "3 hrs",
-    price: "35",
     popular: true,
   },
 ];
@@ -82,47 +54,45 @@ const Services = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [dolarRate, setDolarRate] = useState<number | null>(null);
-  const { toast } = useToast();
-  
-  // Form state
   const [formData, setFormData] = useState({
     name: "",
     price: "",
-    duration: "",
     description: "",
   });
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchDolarRate = async () => {
       try {
         const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
-        if (!response.ok) throw new Error('Error al obtener la tasa');
         const data = await response.json();
-        setDolarRate(data.promedio);
-      } catch (err) {
-        console.error('Error fetching dolar rate:', err);
+        setDolarRate(data.promedio || data.venta);
+      } catch (error) {
+        console.error('Error al obtener la tasa del dólar:', error);
+        setDolarRate(36.5);
       }
     };
+
     fetchDolarRate();
   }, []);
 
-  const calculateBsEquivalent = (usdPrice: string): string => {
-    if (!dolarRate || !usdPrice) return "Calculando...";
-    const price = parseFloat(usdPrice);
-    if (isNaN(price)) return "---";
-    return (price * dolarRate).toFixed(2);
-  };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({
+    const { name, value } = e.target;
+    setFormData(prev => ({
       ...prev,
-      [id]: value,
+      [name]: value
     }));
   };
 
-  const handleSaveService = () => {
-    if (!formData.name || !formData.price || !formData.duration) {
+  const calculateBsPrice = (usdPrice: string) => {
+    if (!dolarRate) return 'Cargando...';
+    const price = parseFloat(usdPrice) || 0;
+    return (price * dolarRate).toFixed(2);
+  };
+
+  const handleSaveService = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.price) {
       toast({
         title: "Error",
         description: "Por favor complete los campos obligatorios.",
@@ -131,41 +101,37 @@ const Services = () => {
       return;
     }
 
-    if (editingId) {
-      // Update existing service
+    if (editingId !== null) {
       setServices(services.map(service => 
         service.id === editingId 
-          ? {
-              ...service,
-              name: formData.name,
-              description: formData.description,
-              duration: formData.duration,
-              price: formData.price,
-            }
+          ? { 
+              ...service, 
+              name: formData.name, 
+              description: formData.description, 
+              price: formData.price 
+            } 
           : service
       ));
       toast({
-        title: "Actualizado",
-        description: "Servicio actualizado correctamente.",
+        title: "Servicio actualizado",
+        description: "El servicio ha sido actualizado exitosamente.",
       });
     } else {
-      // Add new service
       const newService: Service = {
         id: Date.now(),
         name: formData.name,
         description: formData.description,
-        duration: formData.duration,
         price: formData.price,
         popular: false,
       };
       setServices([...services, newService]);
       toast({
-        title: "Éxito",
-        description: "Servicio agregado correctamente.",
+        title: "Servicio agregado",
+        description: "El servicio ha sido agregado exitosamente.",
       });
     }
 
-    setFormData({ name: "", price: "", duration: "", description: "" });
+    setFormData({ name: "", price: "", description: "" });
     setEditingId(null);
     setIsDialogOpen(false);
   };
@@ -174,178 +140,214 @@ const Services = () => {
     setFormData({
       name: service.name,
       price: service.price,
-      duration: service.duration,
       description: service.description,
     });
     setEditingId(service.id);
     setIsDialogOpen(true);
   };
 
+  const handleDeleteService = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    setServices(services.filter(service => service.id !== id));
+    toast({
+      title: "Servicio eliminado",
+      description: "El servicio ha sido eliminado exitosamente.",
+    });
+  };
+
   const handleAddNewClick = () => {
-    setFormData({ name: "", price: "", duration: "", description: "" });
+    setFormData({ name: "", price: "", description: "" });
     setEditingId(null);
     setIsDialogOpen(true);
   };
 
-  const handleDeleteService = (id: number) => {
-    setServices(services.filter((service) => service.id !== id));
-    toast({
-      title: "Eliminado",
-      description: "El servicio ha sido eliminado.",
-      variant: "destructive",
-    });
+  const containerVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.5,
+        ease: [0.22, 1, 0.36, 1],
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: (i: number = 0) => ({
+      opacity: 1,
+      y: 0,
+      transition: { 
+        duration: 0.4,
+        ease: [0.22, 1, 0.36, 1],
+        delay: i * 0.1
+      }
+    })
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Servicios</h1>
-          <p className="text-muted-foreground">Gestiona los servicios ofrecidos</p>
-        </div>
-        
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
+    <div className="p-6">
+      <Toaster />
+      <motion.div 
+        className="space-y-6"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Servicios</h1>
+            <p className="text-muted-foreground">Gestiona los servicios de tu negocio</p>
+          </div>
+          <motion.div variants={itemVariants}>
             <Button 
-              className="gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90 w-full md:w-auto"
-              onClick={handleAddNewClick}
+              onClick={handleAddNewClick} 
+              className="gap-2"
             >
               <IoAddOutline className="h-5 w-5" />
               Nuevo Servicio
             </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden [&>button]:text-white [&>button]:hover:text-white/80">
-            <DialogHeader className="bg-purple-600 p-6 text-center sm:text-center">
-              <DialogTitle className="text-white text-2xl">
-                {editingId ? "Editar Servicio" : "Agregar Nuevo Servicio"}
-              </DialogTitle>
-              <DialogDescription className="text-purple-100">
-                {editingId ? "Modifique los detalles del servicio." : "Complete los detalles del nuevo servicio aquí."}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 p-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
-                <Label htmlFor="name" className="md:text-right">
-                  Nombre
-                </Label>
-                <Input 
-                  id="name" 
-                  placeholder="Ej. Lavado Express" 
-                  className="md:col-span-3" 
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
-                <Label htmlFor="price" className="md:text-right">
-                  Precio (USD)
-                </Label>
-                <div className="md:col-span-3 space-y-1">
-                  <Input 
-                    id="price" 
-                    placeholder="$0.00" 
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                  />
-                  {formData.price && (
-                    <p className="text-xs text-muted-foreground">
-                      Equivalente: Bs. {calculateBsEquivalent(formData.price)}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
-                <Label htmlFor="duration" className="md:text-right">
-                  Duración
-                </Label>
-                <Input 
-                  id="duration" 
-                  placeholder="Ej. 30 min" 
-                  className="md:col-span-3" 
-                  value={formData.duration}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
-                <Label htmlFor="description" className="md:text-right">
-                  Descripción
-                </Label>
-                <Textarea 
-                  id="description" 
-                  placeholder="Descripción del servicio..." 
-                  className="md:col-span-3" 
-                  value={formData.description}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            <DialogFooter className="p-6 pt-0 sm:justify-center">
-              <Button 
-                type="submit" 
-                className="bg-purple-600 hover:bg-purple-700 text-white min-w-[150px]"
-                onClick={handleSaveService}
-              >
-                {editingId ? "Actualizar Servicio" : "Guardar Servicio"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </motion.div>
+        </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {services.map((service) => (
-          <Card key={service.id} className="hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden border-t-4 border-t-primary group">
-            {service.popular && (
-              <Badge className="absolute top-4 right-4 bg-gradient-to-r from-primary to-secondary shadow-md">
-                Popular
-              </Badge>
-            )}
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="p-4 rounded-full bg-gradient-to-br from-primary/10 to-secondary/10">
-                  <IoCarSportOutline className="h-8 w-8 text-primary" />
-                </div>
-              </div>
-              <CardTitle className="mt-4">{service.name}</CardTitle>
-              <CardDescription className="leading-relaxed">{service.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                <span className="text-sm font-medium text-muted-foreground">Duración</span>
-                <span className="font-semibold">{service.duration}</span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t">
-                <div>
-                  <span className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                    ${service.price}
-                  </span>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ≈ Bs. {calculateBsEquivalent(service.price)}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    size="icon" 
-                    className="bg-green-500 hover:bg-green-600 text-white border-none shadow-sm transition-all"
-                    onClick={() => handleEditClick(service)}
-                  >
-                    <IoPencilOutline className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    size="icon" 
-                    className="bg-red-500 hover:bg-red-600 text-white border-none shadow-sm transition-all"
-                    onClick={() => handleDeleteService(service.id)}
-                  >
-                    <IoTrashOutline className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <motion.div 
+        className="rounded-md border overflow-hidden shadow-sm"
+        variants={itemVariants}
+      >
+        <div className="relative w-full overflow-auto">
+          <table className="w-full caption-bottom text-sm">
+            <thead>
+              <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                <th className="h-12 px-4 text-center align-middle font-medium">Servicio</th>
+                <th className="h-12 px-4 text-center align-middle font-medium">Descripción</th>
+                <th className="h-12 px-4 text-center align-middle font-medium">Precio (USD)</th>
+                <th className="h-12 px-4 text-center align-middle font-medium">Precio (Bs)</th>
+                <th className="h-12 px-4 text-center align-middle font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="[&_tr:last-child]:border-0">
+              {services.map((service, index) => (
+                <motion.tr 
+                  key={service.id} 
+                  className="border-b transition-colors hover:bg-muted/50"
+                  custom={index}
+                  variants={itemVariants}
+                >
+                  <td className="p-4 text-center align-middle font-medium">
+                    <div className="flex items-center justify-center gap-2">
+                      <IoCubeOutline className="h-5 w-5 text-primary" />
+                      <span>{service.name}</span>
+                      {service.popular && (
+                        <Badge className="ml-2 bg-gradient-to-r from-primary to-secondary">
+                          Popular
+                        </Badge>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-4 text-center align-middle text-muted-foreground">
+                    {service.description}
+                  </td>
+                  <td className="p-4 text-center align-middle font-medium">
+ ${parseFloat(service.price).toFixed(2)}
+                  </td>
+                  <td className="p-4 text-center align-middle font-medium">
+                    {`Bs. ${calculateBsPrice(service.price)}`}
+                  </td>
+                  <td className="p-4 text-center align-middle">
+                    <div className="flex justify-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleEditClick(service)}
+                      >
+                        <IoPencilOutline className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => handleDeleteService(e, service.id)}
+                      >
+                        <IoTrashOutline className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </motion.tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => !open && setIsDialogOpen(false)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingId !== null ? 'Editar Servicio' : 'Nuevo Servicio'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingId !== null 
+                ? 'Actualiza la información del servicio.'
+                : 'Completa la información para agregar un nuevo servicio.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Nombre <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="col-span-3"
+                placeholder="Ej. Lavado Completo"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="price" className="text-right">
+                Precio (USD) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="price"
+                name="price"
+                type="number"
+                value={formData.price}
+                onChange={handleInputChange}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
+                Descripción
+              </Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                className="col-span-3"
+                placeholder="Descripción del servicio"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" onClick={(e) => handleSaveService(e)}>
+              {editingId !== null ? 'Actualizar' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </motion.div>
     </div>
   );
 };
