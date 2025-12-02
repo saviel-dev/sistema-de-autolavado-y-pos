@@ -22,22 +22,6 @@
     }
   ],
   "categories": ["business", "productivity"],
-  "screenshots": [
-    {
-      "src": "/screenshot-1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Dashboard principal"
-    },
-    {
-      "src": "/screenshot-2.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Vista móvil"
-    }
-  ],
   "shortcuts": [
     {
       "name": "Dashboard",
