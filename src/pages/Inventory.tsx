@@ -10,8 +10,15 @@ import {
   IoTrashOutline, 
   IoPencilOutline, 
   IoImageOutline,
-  IoCubeOutline 
+  IoCubeOutline,
+  IoScanOutline,
+  IoBarcodeOutline,
+  IoCheckmarkCircleOutline,
+  IoAlertCircleOutline
 } from "react-icons/io5";
+import BarcodeScanner from "@/components/BarcodeScanner";
+import { validateBarcode, formatBarcode } from "@/lib/barcodeUtils";
+import { useProducts, Product } from "@/contexts/ProductContext";
 import {
   Dialog,
   DialogContent,
@@ -30,48 +37,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: string;
-  image: string;
-  category: string;
-  stock: number;
-}
 
-const initialProducts: Product[] = [
-  {
-    id: 1,
-    name: "Cera Premium",
-    description: "Cera de alta calidad para protección y brillo duradero",
-    price: "15",
-    image: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=400&h=300&fit=crop",
-    category: "Cuidado",
-    stock: 25,
-  },
-  {
-    id: 2,
-    name: "Shampoo Automotriz",
-    description: "Shampoo concentrado pH neutro para lavado profesional",
-    price: "8",
-    image: "https://images.unsplash.com/photo-1563298723-dcfebaa392e3?w=400&h=300&fit=crop",
-    category: "Limpieza",
-    stock: 40,
-  },
-  {
-    id: 3,
-    name: "Microfibra Premium",
-    description: "Paños de microfibra ultra absorbentes",
-    price: "5",
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=400&h=300&fit=crop",
-    category: "Accesorios",
-    stock: 60,
-  },
-];
 
 const Inventory = () => {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const { products, addProduct, updateProduct, deleteProduct } = useProducts();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [dolarRate, setDolarRate] = useState<number | null>(null);
@@ -79,6 +48,8 @@ const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [showDescription, setShowDescription] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [barcodeSearch, setBarcodeSearch] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -86,6 +57,7 @@ const Inventory = () => {
     category: "",
     stock: "",
     image: "",
+    barcode: "",
   });
   const { toast } = useToast();
 
@@ -145,20 +117,41 @@ const Inventory = () => {
       return;
     }
 
+    // Validate barcode if provided
+    if (formData.barcode) {
+      if (!validateBarcode(formData.barcode)) {
+        toast({
+          title: "Error",
+          description: "El código de barras no es válido.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check for duplicate barcode (only when creating new product)
+      if (editingId === null) {
+        const duplicateBarcode = products.find(p => p.barcode === formData.barcode);
+        if (duplicateBarcode) {
+          toast({
+            title: "Error",
+            description: `El código de barras ya está asignado a "${duplicateBarcode.name}".`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
     if (editingId !== null) {
-      setProducts(products.map(product => 
-        product.id === editingId 
-          ? { 
-              ...product, 
-              name: formData.name, 
-              description: formData.description, 
-              price: formData.price,
-              category: formData.category,
-              stock: parseInt(formData.stock) || 0,
-              image: formData.image || product.image
-            } 
-          : product
-      ));
+      updateProduct(editingId, {
+        name: formData.name,
+        description: formData.description,
+        price: formData.price,
+        category: formData.category,
+        stock: parseInt(formData.stock) || 0,
+        image: formData.image || products.find(p => p.id === editingId)?.image || "",
+        // barcode is not editable
+      });
       toast({
         title: "Producto actualizado",
         description: "El producto ha sido actualizado exitosamente.",
@@ -172,15 +165,16 @@ const Inventory = () => {
         category: formData.category,
         stock: parseInt(formData.stock) || 0,
         image: formData.image || "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=400&h=300&fit=crop",
+        barcode: formData.barcode || undefined,
       };
-      setProducts([...products, newProduct]);
+      addProduct(newProduct);
       toast({
         title: "Producto agregado",
         description: "El producto ha sido agregado exitosamente.",
       });
     }
 
-    setFormData({ name: "", price: "", description: "", category: "", stock: "", image: "" });
+    setFormData({ name: "", price: "", description: "", category: "", stock: "", image: "", barcode: "" });
     setImagePreview("");
     setEditingId(null);
     setIsDialogOpen(false);
@@ -194,6 +188,7 @@ const Inventory = () => {
       category: product.category,
       stock: product.stock.toString(),
       image: product.image,
+      barcode: product.barcode || "",
     });
     setImagePreview(product.image);
     setShowDescription(!!product.description);
@@ -203,7 +198,7 @@ const Inventory = () => {
 
   const handleDeleteProduct = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    setProducts(products.filter(product => product.id !== id));
+    deleteProduct(id);
     toast({
       title: "Producto eliminado",
       description: "El producto ha sido eliminado exitosamente.",
@@ -211,11 +206,44 @@ const Inventory = () => {
   };
 
   const handleAddNewClick = () => {
-    setFormData({ name: "", price: "", description: "", category: "", stock: "", image: "" });
+    setFormData({ name: "", price: "", description: "", category: "", stock: "", image: "", barcode: "" });
     setImagePreview("");
     setShowDescription(false);
     setEditingId(null);
     setIsDialogOpen(true);
+  };
+
+  const handleBarcodeScanned = (barcode: string) => {
+    // Search for product with this barcode
+    const existingProduct = products.find(p => p.barcode === barcode);
+    
+    if (existingProduct) {
+      // Product exists - open edit form
+      handleEditClick(existingProduct);
+      toast({
+        title: "Producto encontrado",
+        description: `${existingProduct.name} - ${formatBarcode(barcode)}`,
+      });
+    } else {
+      // Product doesn't exist - open new product form with barcode pre-filled
+      setFormData({ 
+        name: "", 
+        price: "", 
+        description: "", 
+        category: "", 
+        stock: "", 
+        image: "",
+        barcode: barcode 
+      });
+      setImagePreview("");
+      setShowDescription(false);
+      setEditingId(null);
+      setIsDialogOpen(true);
+      toast({
+        title: "Producto no encontrado",
+        description: `Crear nuevo producto con código ${formatBarcode(barcode)}`,
+      });
+    }
   };
 
   // Get unique categories
@@ -224,9 +252,11 @@ const Inventory = () => {
   // Filter products based on search and category
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
+                         product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (product.barcode && product.barcode.includes(searchTerm));
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesBarcode = !barcodeSearch || (product.barcode && product.barcode.includes(barcodeSearch));
+    return matchesSearch && matchesCategory && matchesBarcode;
   });
 
   const containerVariants: Variants = {
@@ -269,7 +299,15 @@ const Inventory = () => {
             <h1 className="text-2xl md:text-3xl font-bold">Inventario</h1>
             <p className="text-sm md:text-base text-muted-foreground">Gestiona los productos de tu negocio</p>
           </div>
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants} className="flex gap-2">
+            <Button 
+              onClick={() => setIsScannerOpen(true)} 
+              variant="outline"
+              className="gap-2"
+            >
+              <IoScanOutline className="h-5 w-5" />
+              Escanear Código
+            </Button>
             <Button 
               onClick={handleAddNewClick} 
               className="gap-2"
@@ -324,6 +362,12 @@ const Inventory = () => {
                     alt={product.name}
                     className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
                   />
+                  {product.barcode && (
+                    <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md px-2 py-1 flex items-center gap-1 shadow-sm">
+                      <IoBarcodeOutline className="h-3 w-3 text-primary" />
+                      <span className="text-xs font-mono font-medium">{formatBarcode(product.barcode)}</span>
+                    </div>
+                  )}
                 </div>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">
@@ -408,6 +452,53 @@ const Inventory = () => {
                   className="col-span-3"
                   placeholder="Ej. Cuidado, Limpieza"
                 />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="barcode" className="text-right">
+                  Código de Barras
+                </Label>
+                <div className="col-span-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      id="barcode"
+                      name="barcode"
+                      value={formData.barcode}
+                      onChange={handleInputChange}
+                      placeholder="EAN-13, UPC-A, etc."
+                      className="flex-1 font-mono"
+                      disabled={editingId !== null}
+                    />
+                    {editingId === null && (
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsScannerOpen(true)}
+                      >
+                        <IoScanOutline className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {formData.barcode && (
+                    <div className="flex items-center gap-2 text-sm">
+                      {validateBarcode(formData.barcode) ? (
+                        <>
+                          <IoCheckmarkCircleOutline className="h-4 w-4 text-green-500" />
+                          <span className="text-green-600 dark:text-green-400">
+                            Código válido: {formatBarcode(formData.barcode)}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <IoAlertCircleOutline className="h-4 w-4 text-destructive" />
+                          <span className="text-destructive">
+                            Código inválido
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="price" className="text-right">
@@ -520,6 +611,13 @@ const Inventory = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScanned}
+          title="Escanear Código de Barras"
+        />
       </motion.div>
     </div>
   );

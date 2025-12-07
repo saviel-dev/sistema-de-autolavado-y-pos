@@ -13,8 +13,26 @@ import {
   IoCubeOutline,
   IoCartOutline,
   IoCheckmarkCircleOutline,
-  IoDownloadOutline
+  IoDownloadOutline,
+  IoPersonOutline,
+  IoPersonCircleOutline,
+  IoCloseOutline,
+  IoCloseCircle,
+  IoImagesOutline,
+  IoPeopleOutline,
+  IoCalendarOutline,
+  IoTimeOutline,
+  IoCheckmarkOutline,
+  IoSearch,
+  IoDocumentTextOutline,
+  IoCarSportOutline,
+  IoScanOutline,
+  IoBarcodeOutline
 } from "react-icons/io5";
+import BarcodeScanner from "@/components/BarcodeScanner";
+import { formatBarcode } from "@/lib/barcodeUtils";
+import { useProducts } from "@/contexts/ProductContext";
+import { useMovements } from "@/contexts/MovementContext";
 import {
   Card,
   CardContent,
@@ -31,6 +49,29 @@ import {
 } from "@/components/ui/dialog";
 import { Toaster } from "@/components/ui/toaster";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface CartItem {
   id: string;
@@ -51,7 +92,83 @@ interface Product {
   id: number;
   name: string;
   price: string;
+  barcode?: string;
 }
+
+interface Customer {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  vehicle: string;
+  vehicleType: string;
+  licensePlate: string;
+  status: "VIP" | "Regular" | "Normal";
+  visits: number;
+  images?: string[];
+}
+
+interface Order {
+  id: number;
+  orderType: "walk-in" | "appointment";
+  customerId: number;
+  customerName: string;
+  customerVehicle?: string;
+  services: number[];
+  serviceNames: string[];
+  status: "Pendiente" | "Confirmada" | "En Proceso" | "Completada" | "Cancelada";
+  date: string;
+  time: string;
+  totalAmount: number;
+  notes?: string;
+}
+
+interface Appointment {
+  id: number;
+  client: string;
+  service: string;
+  date: string;
+  time: string;
+  status: "Pendiente" | "Confirmada" | "Completada" | "Cancelada";
+  phone: string;
+}
+
+// Datos de clientes
+const customers: Customer[] = [
+  {
+    id: 1,
+    name: "Juan Pérez",
+    email: "juan@example.com",
+    phone: "584123456789",
+    vehicle: "Toyota Corolla",
+    vehicleType: "Sedán",
+    licensePlate: "ABC123",
+    status: "VIP",
+    visits: 0
+  },
+  {
+    id: 2,
+    name: "María González",
+    email: "maria@example.com",
+    phone: "584123456788",
+    vehicle: "Honda Civic",
+    vehicleType: "Sedán",
+    licensePlate: "DEF456",
+    status: "Regular",
+    visits: 0
+  },
+  {
+    id: 3,
+    name: "Carlos Rodríguez",
+    email: "carlos@example.com",
+    phone: "584123456787",
+    vehicle: "Ford F-150",
+    vehicleType: "Camioneta",
+    licensePlate: "GHI789",
+    status: "Normal",
+    visits: 0
+  }
+];
 
 // Datos de ejemplo
 const services: Service[] = [
@@ -61,20 +178,171 @@ const services: Service[] = [
   { id: 4, name: "Pulido", price: "25" },
 ];
 
-const products: Product[] = [
-  { id: 1, name: "Cera Premium", price: "15" },
-  { id: 2, name: "Shampoo Automotriz", price: "8" },
-  { id: 3, name: "Microfibra Premium", price: "5" },
-  { id: 4, name: "Aromatizante", price: "3" },
-];
+
 
 const POS = () => {
+  const { products, updateStock, checkStockAvailability } = useProducts();
+  const { registerSaleMovements } = useMovements();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [dolarRate, setDolarRate] = useState<number | null>(null);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   const [lastSale, setLastSale] = useState<{ id: string; total: number } | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { toast } = useToast();
+
+  // Customer selection states
+  const [customers, setCustomers] = useState<Customer[]>([
+    {
+      id: 1,
+      name: "Juan Pérez",
+      email: "juan@example.com",
+      phone: "584123456789",
+      vehicle: "Toyota Corolla",
+      vehicleType: "Sedán",
+      licensePlate: "ABC123",
+      status: "VIP",
+      visits: 0
+    },
+    {
+      id: 2,
+      name: "María González",
+      email: "maria@example.com",
+      phone: "584123456788",
+      vehicle: "Honda Civic",
+      vehicleType: "Sedán",
+      licensePlate: "DEF456",
+      status: "Regular",
+      visits: 0
+    },
+    {
+      id: 3,
+      name: "Carlos Rodríguez",
+      email: "carlos@example.com",
+      phone: "584123456787",
+      vehicle: "Ford F-150",
+      vehicleType: "Camioneta",
+      licensePlate: "GHI789",
+      status: "Normal",
+      visits: 0
+    }
+  ]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const filteredCustomers = customers.filter(customer => 
+    customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+    customer.phone.includes(customerSearchQuery) ||
+    (customer.licensePlate && customer.licensePlate.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+  );
+
+  const handleCreateCustomer = (newCustomer: Customer) => {
+    const updatedCustomers = [...customers, newCustomer];
+    setCustomers(updatedCustomers);
+    setSelectedCustomer(newCustomer);
+    localStorage.setItem('customers', JSON.stringify(updatedCustomers));
+    setIsCustomerDialogOpen(false);
+    
+    // Reset form
+    setCustomerFormData({
+      name: "",
+      email: "",
+      phone: "",
+      vehicle: "",
+      vehicleType: "",
+      licensePlate: "",
+      status: "Normal",
+      images: [],
+    });
+  };
+
+  const handleCreateOrder = () => {
+    if (!selectedCustomer) {
+      toast({
+        title: "Cliente requerido",
+        description: "Por favor selecciona o crea un cliente primero.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setOrderFormData({
+      ...orderFormData,
+      customerId: selectedCustomer.id,
+      customerName: selectedCustomer.name,
+      customerVehicle: selectedCustomer.vehicle,
+    });
+    
+    setIsOrderDialogOpen(true);
+  };
+
+  const handleCreateAppointment = () => {
+    if (!selectedCustomer) {
+      toast({
+        title: "Cliente requerido",
+        description: "Por favor selecciona o crea un cliente primero.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setAppointmentFormData({
+      ...appointmentFormData,
+      client: selectedCustomer.name,
+      phone: selectedCustomer.phone,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    });
+    
+    setIsAppointmentDialogOpen(true);
+  };
+
+  const clearSelectedCustomer = () => {
+    setSelectedCustomer(null);
+  };
+
+  // Dialog states
+  const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  
+  // Customer form data
+  const [customerFormData, setCustomerFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    vehicle: "",
+    vehicleType: "",
+    licensePlate: "",
+    status: "Normal" as "VIP" | "Regular" | "Normal",
+    images: [] as string[],
+  });
+  
+  // Order form data  
+  const [orderFormData, setOrderFormData] = useState({
+    orderType: "walk-in" as "walk-in" | "appointment",
+    customerId: 0,
+    customerName: "",
+    customerVehicle: "",
+    services: [] as number[],
+    serviceNames: [] as string[],
+    status: "Pendiente" as Order["status"],
+    date: "",
+    time: "",
+    notes: "",
+  });
+  
+  // Appointment form data
+  const [appointmentFormData, setAppointmentFormData] = useState({
+    client: "",
+    service: "",
+    date: "",
+    time: "",
+    phone: "",
+    status: "Pendiente" as Appointment["status"],
+  });
+  
+  const [servicesPopoverOpen, setServicesPopoverOpen] = useState(false);
 
   useEffect(() => {
     const fetchDolarRate = async () => {
@@ -89,6 +357,12 @@ const POS = () => {
     };
 
     fetchDolarRate();
+    
+    // Load customers from localStorage
+    const storedCustomers = localStorage.getItem('customers');
+    if (storedCustomers) {
+      setCustomers(JSON.parse(storedCustomers));
+    }
   }, []);
 
   const addToCart = (type: "service" | "product", item: Service | Product) => {
@@ -185,6 +459,153 @@ const POS = () => {
     setLastSale(null);
   };
 
+  const handleBarcodeScanned = (barcode: string) => {
+    // Buscar producto por código de barras
+    const product = products.find(p => p.barcode === barcode);
+    
+    if (product) {
+      addToCart("product", product);
+      toast({
+        title: "Producto escaneado",
+        description: `${product.name} agregado al carrito`,
+      });
+    } else {
+      toast({
+        title: "Producto no encontrado",
+        description: "No existe un producto con ese código de barras",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // --- Customer Handlers ---
+  const handleCustomerInputChange = (field: string, value: any) => {
+    setCustomerFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const currentImages = customerFormData.images || [];
+      const remainingSlots = 10 - currentImages.length;
+      
+      if (remainingSlots === 0) {
+        toast({
+          title: "Límite alcanzado",
+          description: "Máximo 10 imágenes por cliente.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      
+      filesToProcess.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setCustomerFormData(prev => ({
+            ...prev,
+            images: [...(prev.images || []), reader.result as string]
+          }));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setCustomerFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSaveCustomer = () => {
+    if (!customerFormData.name || !customerFormData.phone) {
+      toast({
+        title: "Error",
+        description: "Nombre y teléfono son obligatorios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newCustomer: Customer = {
+      id: Date.now(),
+      ...customerFormData,
+      visits: 0
+    };
+
+    const updatedCustomers = [...customers, newCustomer];
+    setCustomers(updatedCustomers);
+    localStorage.setItem('customers', JSON.stringify(updatedCustomers));
+    
+    setSelectedCustomer(newCustomer);
+    setIsCustomerDialogOpen(false);
+    setCustomerFormData({
+      name: "",
+      email: "",
+      phone: "",
+      vehicle: "",
+      vehicleType: "",
+      licensePlate: "",
+      status: "Normal",
+      images: [],
+    });
+
+    toast({
+      title: "Cliente creado",
+      description: "El cliente ha sido creado y seleccionado.",
+    });
+  };
+
+  // --- Order Handlers ---
+  const handleOrderInputChange = (field: string, value: any) => {
+    setOrderFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveOrder = () => {
+    if (!orderFormData.customerId || orderFormData.services.length === 0) {
+      toast({
+        title: "Error",
+        description: "Seleccione un cliente y al menos un servicio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Logic to save order would go here (e.g. save to localStorage or API)
+    // For now we just simulate success
+    toast({
+      title: "Pedido creado",
+      description: "El pedido ha sido creado exitosamente.",
+    });
+    setIsOrderDialogOpen(false);
+  };
+
+  // --- Appointment Handlers ---
+  const handleAppointmentInputChange = (field: string, value: any) => {
+    setAppointmentFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveAppointment = () => {
+    if (!appointmentFormData.client || !appointmentFormData.date || !appointmentFormData.time) {
+      toast({
+        title: "Error",
+        description: "Complete los campos obligatorios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Logic to save appointment
+    toast({
+      title: "Cita agendada",
+      description: "La cita ha sido agendada exitosamente.",
+    });
+    setIsAppointmentDialogOpen(false);
+  };
+
   const exportToPDF = () => {
     if (!lastSale) return;
 
@@ -215,6 +636,32 @@ const POS = () => {
     doc.text(`Fecha: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 20, 67);
     doc.text(`Método de Pago: ${paymentMethod}`, 20, 72);
 
+    // Add customer information
+    if (selectedCustomer) {
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("Cliente:", 20, 82);
+      doc.setFont("helvetica", "normal");
+      doc.text(selectedCustomer.name, 40, 82);
+      
+      if (selectedCustomer.phone) {
+        doc.text("Teléfono:", 20, 87);
+        doc.text(selectedCustomer.phone, 40, 87);
+      }
+      
+      if (selectedCustomer.vehicle) {
+        doc.text("Vehículo:", 20, 92);
+        const vehicleInfo = selectedCustomer.licensePlate 
+          ? `${selectedCustomer.vehicle} (${selectedCustomer.licensePlate})`
+          : selectedCustomer.vehicle;
+        doc.text(vehicleInfo, 40, 92);
+      }
+      
+      // Add a small separator line
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 95, 190, 95);
+    }
+
     const tableColumn = ["Item", "Cant.", "Precio Unit.", "Total"];
     const tableRows = cart.map(item => [
       item.name,
@@ -224,7 +671,7 @@ const POS = () => {
     ]);
 
     autoTable(doc, {
-      startY: 80,
+      startY: selectedCustomer ? 100 : 80,
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
@@ -296,6 +743,14 @@ const POS = () => {
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">POS - Punto de Venta</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Procesa ventas de servicios y productos</p>
           </div>
+          <Button 
+            onClick={() => setIsScannerOpen(true)} 
+            variant="outline"
+            className="gap-2"
+          >
+            <IoScanOutline className="h-5 w-5" />
+            Escanear Producto
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -352,6 +807,12 @@ const POS = () => {
                             <IoCubeOutline className="h-5 w-5 text-primary" />
                             <CardTitle className="text-lg">{product.name}</CardTitle>
                           </div>
+                          {product.barcode && (
+                            <Badge variant="outline" className="gap-1 text-xs font-mono">
+                              <IoBarcodeOutline className="h-3 w-3" />
+                              {formatBarcode(product.barcode)}
+                            </Badge>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -436,6 +897,173 @@ const POS = () => {
                   )}
                 </div>
 
+                {/* Customer Selection Section */}
+                <div className="space-y-3 pb-4 border-b">
+                  <label className="text-sm font-medium">Cliente (Opcional):</label>
+                  <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <div className="relative w-full">
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between h-10 pr-8"
+                      >
+                        {selectedCustomer ? (
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-medium">
+                                {selectedCustomer.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="text-left overflow-hidden">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium truncate">{selectedCustomer.name}</span>
+                                <Badge 
+                                  variant={selectedCustomer.status === 'VIP' ? 'default' : 'secondary'}
+                                  className="text-xs h-4 px-1.5"
+                                >
+                                  {selectedCustomer.status}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {selectedCustomer.phone} • {selectedCustomer.licensePlate || 'Sin placa'}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <IoPersonOutline className="h-4 w-4" />
+                            Seleccionar cliente
+                          </span>
+                        )}
+                      </Button>
+                      {selectedCustomer && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCustomer(null);
+                          }}
+                        >
+                          <IoCloseOutline className="h-4 w-4" />
+                          <span className="sr-only">Quitar cliente</span>
+                        </Button>
+                      )}
+                    </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Buscar por nombre, teléfono o placa..." 
+                          value={customerSearchQuery}
+                          onValueChange={setCustomerSearchQuery}
+                        />
+                        <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+                        <CommandGroup className="max-h-[400px] overflow-y-auto">
+                          {filteredCustomers.map((customer) => (
+                            <CommandItem
+                              key={customer.id}
+                              value={`${customer.name} ${customer.phone} ${customer.licensePlate}`}
+                              onSelect={() => {
+                                setSelectedCustomer(customer);
+                                setCustomerSearchOpen(false);
+                                setCustomerSearchQuery('');
+                              }}
+                              className="group py-2 px-3 rounded-md transition-all duration-200 ease-in-out hover:bg-primary hover:shadow-sm cursor-pointer"
+                            >
+                              <div className="flex items-start gap-3 w-full">
+                                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/80">
+                                  <span className="text-sm font-medium group-hover:text-white">
+                                    {customer.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium truncate group-hover:text-white">{customer.name}</p>
+                                    <Badge 
+                                      variant={customer.status === 'VIP' ? 'default' : 'secondary'}
+                                      className="text-xs h-4 px-1.5 group-hover:bg-white/20 group-hover:text-white"
+                                    >
+                                      {customer.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5 group-hover:text-white/90">
+                                    {customer.phone && <span className="flex items-center"><IoPhonePortraitOutline className="mr-1 h-3 w-3 group-hover:text-white" /> {customer.phone}</span>}
+                                    {customer.licensePlate && <span className="flex items-center"><IoCarSportOutline className="mr-1 h-3 w-3 group-hover:text-white" /> {customer.licensePlate}</span>}
+                                    {customer.vehicle && <span className="truncate">{customer.vehicle}</span>}
+                                  </div>
+                                </div>
+                                {selectedCustomer?.id === customer.id && (
+                                  <IoCheckmarkOutline className="h-4 w-4 ml-2 flex-shrink-0" />
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Selected Customer Info */}
+                  {selectedCustomer && (
+                    <div className="p-3 bg-muted/50 rounded-lg space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{selectedCustomer.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedCustomer(null)}
+                          className="h-6 px-2 text-xs"
+                        >
+                          <IoCloseOutline className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Tel: {selectedCustomer.phone}
+                      </div>
+                      {selectedCustomer.vehicle && (
+                        <div className="text-xs text-muted-foreground">
+                          {selectedCustomer.vehicle} - {selectedCustomer.licensePlate}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Quick Action Buttons */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCustomerDialogOpen(true)}
+                      className="text-xs h-9"
+                    >
+                      <IoPersonOutline className="h-4 w-4 mr-1" />
+                      Cliente
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsOrderDialogOpen(true)}
+                      className="text-xs h-9"
+                    >
+                      <IoCartOutline className="h-4 w-4 mr-1" />
+                      Pedido
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAppointmentDialogOpen(true)}
+                      className="text-xs h-9"
+                    >
+                      <IoCalendarOutline className="h-4 w-4 mr-1" />
+                      Cita
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="space-y-3 pt-4 border-t">
                   <div className="flex justify-between items-end">
                     <span className="text-lg font-semibold">Subtotal:</span>
@@ -495,6 +1123,354 @@ const POS = () => {
           </div>
         </div>
 
+        {/* Customer Creation Dialog */}
+        <Dialog open={isCustomerDialogOpen} onOpenChange={setIsCustomerDialogOpen}>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Crear Nuevo Cliente</DialogTitle>
+              <DialogDescription>
+                Ingrese los datos del nuevo cliente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nombre *</Label>
+                  <Input
+                    id="name"
+                    value={customerFormData.name}
+                    onChange={(e) => handleCustomerInputChange("name", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Teléfono *</Label>
+                  <Input
+                    id="phone"
+                    value={customerFormData.phone}
+                    onChange={(e) => handleCustomerInputChange("phone", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={customerFormData.email}
+                  onChange={(e) => handleCustomerInputChange("email", e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="vehicle">Vehículo</Label>
+                  <Input
+                    id="vehicle"
+                    placeholder="Ej. Toyota Corolla"
+                    value={customerFormData.vehicle}
+                    onChange={(e) => handleCustomerInputChange("vehicle", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="licensePlate">Placa</Label>
+                  <Input
+                    id="licensePlate"
+                    value={customerFormData.licensePlate}
+                    onChange={(e) => handleCustomerInputChange("licensePlate", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleType">Tipo de Vehículo</Label>
+                  <Select
+                    value={customerFormData.vehicleType}
+                    onValueChange={(value) => handleCustomerInputChange("vehicleType", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Sedan">Sedan</SelectItem>
+                      <SelectItem value="SUV">SUV</SelectItem>
+                      <SelectItem value="Camioneta">Camioneta</SelectItem>
+                      <SelectItem value="Moto">Moto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Estatus</Label>
+                  <Select
+                    value={customerFormData.status}
+                    onValueChange={(value) => handleCustomerInputChange("status", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Normal">Normal</SelectItem>
+                      <SelectItem value="Regular">Regular</SelectItem>
+                      <SelectItem value="VIP">VIP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Image Upload Section */}
+              <div className="space-y-2">
+                <Label>Fotos del vehículo ({customerFormData.images.length}/10)</Label>
+                <div className="grid grid-cols-5 gap-2 mt-2">
+                  {customerFormData.images.map((img, index) => (
+                    <div key={index} className="relative aspect-square group">
+                      <img
+                        src={img}
+                        alt={`Upload ${index + 1}`}
+                        className="w-full h-full object-cover rounded-md border"
+                      />
+                      <button
+                        onClick={() => handleRemoveImage(index)}
+                        className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={`Eliminar imagen ${index + 1}`}
+                      >
+                        <IoCloseCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {customerFormData.images.length < 10 && (
+                    <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed rounded-md cursor-pointer hover:bg-muted/50 transition-colors">
+                      <IoImagesOutline className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground mt-1">Agregar</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCustomerDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveCustomer}>Guardar Cliente</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Order Creation Dialog */}
+        <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Crear Nuevo Pedido</DialogTitle>
+              <DialogDescription>
+                Cree un nuevo pedido o cita para un cliente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Tipo de Pedido</Label>
+                <Tabs
+                  value={orderFormData.orderType}
+                  onValueChange={(value) => handleOrderInputChange("orderType", value)}
+                  className="w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="walk-in">Por Llegada</TabsTrigger>
+                    <TabsTrigger value="appointment">Cita Programada</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Cliente *</Label>
+                <Select
+                  value={orderFormData.customerId.toString()}
+                  onValueChange={(value) => handleOrderInputChange("customerId", parseInt(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id.toString()}>
+                        {customer.name} - {customer.licensePlate} ({customer.vehicle})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Servicios *</Label>
+                <Popover open={servicesPopoverOpen} onOpenChange={setServicesPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      <IoAddOutline className="mr-2 h-4 w-4" />
+                      Seleccionar servicios
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar servicio..." />
+                      <CommandEmpty>No se encontraron servicios.</CommandEmpty>
+                      <CommandGroup>
+                        {services.map((service) => (
+                          <CommandItem
+                            key={service.id}
+                            onSelect={() => {
+                              const currentServices = orderFormData.services;
+                              const currentNames = orderFormData.serviceNames;
+                              if (!currentServices.includes(service.id)) {
+                                handleOrderInputChange("services", [...currentServices, service.id]);
+                                handleOrderInputChange("serviceNames", [...currentNames, service.name]);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{service.name}</span>
+                              <span>${service.price}</span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                
+                {/* Selected Services Tags */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {orderFormData.services.map((serviceId) => {
+                    const service = services.find(s => s.id === serviceId);
+                    if (!service) return null;
+                    return (
+                      <Badge key={serviceId} variant="secondary" className="gap-1">
+                        {service.name}
+                        <button
+                          aria-label={`Eliminar ${service.name}`}
+                          onClick={() => {
+                            handleOrderInputChange("services", orderFormData.services.filter(id => id !== serviceId));
+                            handleOrderInputChange("serviceNames", orderFormData.serviceNames.filter(name => name !== service.name));
+                          }}
+                          className="ml-1 hover:bg-destructive/20 rounded-full"
+                        >
+                          <IoCloseOutline className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {orderFormData.orderType === "appointment" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="orderDate">Fecha *</Label>
+                    <Input
+                      id="orderDate"
+                      type="date"
+                      value={orderFormData.date}
+                      onChange={(e) => handleOrderInputChange("date", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="orderTime">Hora *</Label>
+                    <Input
+                      id="orderTime"
+                      type="time"
+                      value={orderFormData.time}
+                      onChange={(e) => handleOrderInputChange("time", e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="orderNotes">Notas</Label>
+                <Textarea
+                  id="orderNotes"
+                  value={orderFormData.notes}
+                  onChange={(e) => handleOrderInputChange("notes", e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsOrderDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveOrder}>Crear Pedido</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Appointment Creation Dialog */}
+        <Dialog open={isAppointmentDialogOpen} onOpenChange={setIsAppointmentDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Agendar Nueva Cita</DialogTitle>
+              <DialogDescription>
+                Programe una nueva cita rápidamente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="apptClient">Cliente *</Label>
+                <Input
+                  id="apptClient"
+                  placeholder="Nombre del cliente"
+                  value={appointmentFormData.client}
+                  onChange={(e) => handleAppointmentInputChange("client", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="apptService">Servicio *</Label>
+                <Input
+                  id="apptService"
+                  placeholder="Ej. Lavado Completo"
+                  value={appointmentFormData.service}
+                  onChange={(e) => handleAppointmentInputChange("service", e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="apptDate">Fecha *</Label>
+                  <Input
+                    id="apptDate"
+                    type="date"
+                    value={appointmentFormData.date}
+                    onChange={(e) => handleAppointmentInputChange("date", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="apptTime">Hora *</Label>
+                  <Input
+                    id="apptTime"
+                    type="time"
+                    value={appointmentFormData.time}
+                    onChange={(e) => handleAppointmentInputChange("time", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="apptPhone">Teléfono</Label>
+                <Input
+                  id="apptPhone"
+                  value={appointmentFormData.phone}
+                  onChange={(e) => handleAppointmentInputChange("phone", e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAppointmentDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveAppointment}>Agendar Cita</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={showThankYouModal} onOpenChange={closeAndClear}>
           <DialogContent className="sm:max-w-md border-0 shadow-2xl">
             <motion.div 
@@ -514,13 +1490,47 @@ const POS = () => {
                 </div>
               </motion.div>
 
-              <DialogHeader className="space-y-2">
-                <DialogTitle className="text-2xl font-bold text-center text-gray-900">
-                  ¡Gracias por tu Compra!
-                </DialogTitle>
-                <DialogDescription className="text-center text-gray-500">
-                  La transacción ha sido completada exitosamente.
-                </DialogDescription>
+              <DialogHeader className="space-y-6">
+                <div className="space-y-2">
+                  <DialogTitle className="text-2xl font-bold text-center text-gray-900">
+                    ¡Gracias por su compra!
+                  </DialogTitle>
+                  <DialogDescription className="text-center text-gray-500">
+                    Su pedido ha sido procesado exitosamente.
+                  </DialogDescription>
+                </div>
+                
+                {selectedCustomer && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-lg border border-gray-200 shadow-sm hover:shadow transition-shadow duration-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-semibold text-gray-800 flex items-center">
+                        <IoPersonCircleOutline className="mr-1.5 h-4 w-4 text-primary" />
+                        Cliente
+                      </h3>
+                      {selectedCustomer.status && (
+                        <Badge 
+                          variant={selectedCustomer.status === 'VIP' ? 'default' : 'secondary'}
+                          className="px-2 py-1 text-xs font-medium"
+                        >
+                          {selectedCustomer.status}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-1 text-sm">
+                      <p className="text-gray-900">{selectedCustomer.name}</p>
+                      {selectedCustomer.phone && (
+                        <p className="text-gray-600">{selectedCustomer.phone}</p>
+                      )}
+                      {(selectedCustomer.vehicle || selectedCustomer.licensePlate) && (
+                        <p className="text-gray-700">
+                          {selectedCustomer.vehicle} 
+                          {selectedCustomer.licensePlate && `(${selectedCustomer.licensePlate})`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </DialogHeader>
 
               {lastSale && (
@@ -564,6 +1574,13 @@ const POS = () => {
             </motion.div>
           </DialogContent>
         </Dialog>
+
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScanned}
+          title="Escanear Producto para Agregar al Carrito"
+        />
       </motion.div>
     </div>
   );

@@ -120,7 +120,7 @@ const Login = () => {
               <IoCarSportOutline className="text-xl" />
             </div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-800">
-              Auto Lavado <span className="text-indigo-600">Gochi</span>
+              AutoLavado <span className="text-indigo-600">Gochi</span>
             </h2>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mt-4">Iniciar sesión</h1>

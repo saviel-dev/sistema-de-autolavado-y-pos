@@ -10,8 +10,14 @@ import {
   IoAddOutline, 
   IoArrowUpOutline,
   IoArrowDownOutline,
-  IoSwapHorizontalOutline
+  IoSwapHorizontalOutline,
+  IoScanOutline,
+  IoBarcodeOutline
 } from "react-icons/io5";
+import BarcodeScanner from "@/components/BarcodeScanner";
+import { formatBarcode } from "@/lib/barcodeUtils";
+import { useProducts } from "@/contexts/ProductContext";
+import { useMovements } from "@/contexts/MovementContext";
 import {
   Dialog,
   DialogContent,
@@ -55,9 +61,11 @@ const initialMovements: Movement[] = [
 ];
 
 const Movements = () => {
-  const [movements, setMovements] = useState<Movement[]>(initialMovements);
+  const { products, updateStock } = useProducts();
+  const { movements, addMovement } = useMovements();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [formData, setFormData] = useState({
     type: "entry" as "entry" | "exit",
     productId: "",
@@ -66,13 +74,6 @@ const Movements = () => {
     reason: "",
   });
   const { toast } = useToast();
-
-  // Productos de ejemplo (en producción, esto vendría del contexto o API)
-  const products = [
-    { id: 1, name: "Cera Premium" },
-    { id: 2, name: "Shampoo Automotriz" },
-    { id: 3, name: "Microfibra Premium" },
-  ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -114,17 +115,21 @@ const Movements = () => {
       return;
     }
 
-    const newMovement: Movement = {
-      id: Date.now(),
+    // Registrar movimiento
+    addMovement({
       type: formData.type,
       productId: parseInt(formData.productId),
       productName: formData.productName,
       quantity: quantity,
-      date: new Date().toISOString().split('T')[0],
       reason: formData.reason,
-    };
+    });
 
-    setMovements([newMovement, ...movements]);
+    // Actualizar stock
+    updateStock(
+      parseInt(formData.productId),
+      quantity,
+      formData.type === 'entry' ? 'add' : 'subtract'
+    );
     
     toast({
       title: formData.type === "entry" ? "Entrada registrada" : "Salida registrada",
@@ -150,6 +155,29 @@ const Movements = () => {
       reason: "",
     });
     setIsDialogOpen(true);
+  };
+
+  const handleBarcodeScanned = (barcode: string) => {
+    // Buscar producto por código de barras
+    const product = products.find(p => p.barcode === barcode);
+    
+    if (product) {
+      setFormData(prev => ({
+        ...prev,
+        productId: product.id.toString(),
+        productName: product.name
+      }));
+      toast({
+        title: "Producto encontrado",
+        description: `${product.name} seleccionado`,
+      });
+    } else {
+      toast({
+        title: "Producto no encontrado",
+        description: "No existe un producto con ese código de barras",
+        variant: "destructive",
+      });
+    }
   };
 
   // Filter movements
@@ -382,20 +410,41 @@ const Movements = () => {
                 <Label htmlFor="productId" className="text-right">
                   Producto <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  id="productId"
-                  name="productId"
-                  value={formData.productId}
-                  onChange={handleInputChange}
-                  className="col-span-3 h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="">Seleccionar producto...</option>
-                  {products.map(product => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="col-span-3 space-y-2">
+                  <div className="flex gap-2">
+                    <select
+                      id="productId"
+                      name="productId"
+                      value={formData.productId}
+                      onChange={handleInputChange}
+                      className="flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="">Seleccionar producto...</option>
+                      {products.map(product => (
+                        <option key={product.id} value={product.id}>
+                          {product.name}
+                          {product.barcode && ` - ${formatBarcode(product.barcode)}`}
+                        </option>
+                      ))}
+                    </select>
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setIsScannerOpen(true)}
+                    >
+                      <IoScanOutline className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {formData.productId && products.find(p => p.id === parseInt(formData.productId))?.barcode && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <IoBarcodeOutline className="h-4 w-4" />
+                      <span className="font-mono">
+                        {formatBarcode(products.find(p => p.id === parseInt(formData.productId))?.barcode || "")}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="quantity" className="text-right">
@@ -437,6 +486,13 @@ const Movements = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScanned}
+          title="Escanear Producto"
+        />
       </motion.div>
     </div>
   );

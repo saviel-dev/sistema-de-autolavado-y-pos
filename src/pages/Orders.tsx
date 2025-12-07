@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -85,27 +85,27 @@ interface Order {
   createdAt: string;
 }
 
-// Mock customers data - en producción esto vendría de un context/store
-const mockCustomers = [
-  {
-    id: 1,
-    name: "Juan Pérez",
-    vehicle: "Toyota Corolla",
-    phone: "584123456789",
-  },
-  {
-    id: 2,
-    name: "María González",
-    vehicle: "Honda Civic",
-    phone: "584123456788",
-  },
-  {
-    id: 3,
-    name: "Carlos Rodríguez",
-    vehicle: "Ford F-150",
-    phone: "584123456787",
-  },
-];
+// Interface para el cliente
+interface Customer {
+  id: number;
+  name: string;
+  vehicle: string;
+  phone: string;
+  email?: string;
+  vehicleType?: string;
+  licensePlate?: string;
+  status?: string;
+  visits?: number;
+}
+
+// Obtener clientes del localStorage
+const getCustomers = (): Customer[] => {
+  if (typeof window !== 'undefined') {
+    const storedCustomers = localStorage.getItem('customers');
+    return storedCustomers ? JSON.parse(storedCustomers) : [];
+  }
+  return [];
+};
 
 // Mock services data - en producción esto vendría de un context/store
 const mockServices = [
@@ -179,8 +179,20 @@ const Orders = () => {
     }));
   };
 
+  const [customers, setCustomers] = useState<Customer[]>(getCustomers());
+  
+  // Actualizar clientes cuando cambie el localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setCustomers(getCustomers());
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const handleCustomerSelect = (customerId: string) => {
-    const customer = mockCustomers.find((c) => c.id === parseInt(customerId));
+    const customer = customers.find((c) => c.id === parseInt(customerId));
     if (customer) {
       setFormData((prev) => ({
         ...prev,
@@ -534,7 +546,7 @@ const Orders = () => {
                       <SelectValue placeholder="Seleccionar cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockCustomers.map((customer) => (
+                      {customers.map((customer) => (
                         <SelectItem
                           key={customer.id}
                           value={customer.id.toString()}
@@ -611,6 +623,8 @@ const Orders = () => {
                                   type="button"
                                   onClick={() => handleRemoveService(serviceId)}
                                   className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
+                                  aria-label={`Remove ${service?.name || 'service'}`}
+                                  title={`Remove ${service?.name || 'service'}`}
                                 >
                                   <IoCloseOutline className="h-3 w-3" />
                                 </button>
