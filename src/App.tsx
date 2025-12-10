@@ -15,6 +15,7 @@ import Movements from "./pages/Movements";
 import POS from "./pages/POS";
 import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
+import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import BarcodeTestPanel from "./pages/BarcodeTestPanel";
@@ -71,6 +72,7 @@ const App = () => {
                             <Route path="/movements" element={<Movements />} />
                             <Route path="/appointments" element={<Orders />} />
                             <Route path="/customers" element={<Customers />} />
+                            <Route path="/reports" element={<Reports />} />
                             <Route path="/settings" element={<Settings />} />
                             {import.meta.env.DEV && (
                               <Route path="/barcode-test" element={<BarcodeTestPanel />} />

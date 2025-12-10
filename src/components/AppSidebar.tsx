@@ -19,6 +19,7 @@ import {
   IoCalendarOutline,
   IoPeopleOutline,
   IoSettingsOutline,
+  IoBarChartOutline,
 } from "react-icons/io5";
 
 const menuItems = [
@@ -61,6 +62,11 @@ const menuItems = [
     title: "Configuración",
     url: "/settings",
     icon: IoSettingsOutline,
+  },
+  {
+    title: "Reportes",
+    url: "/reports",
+    icon: IoBarChartOutline,
   },
 ];
 
