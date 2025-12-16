@@ -1,8 +1,8 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarToggle } from "@/components/ui/SidebarToggle";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Button } from "@/components/ui/button";
-import { IoLogOutOutline } from "react-icons/io5";
+import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatePresence, motion } from "framer-motion";
 
 const MainLayout = () => {
@@ -18,17 +18,9 @@ const MainLayout = () => {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card">
-            <SidebarTrigger className="text-foreground" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="gap-2 hover:bg-red-500 hover:text-white transition-all duration-300"
-            >
-              <IoLogOutOutline className="h-5 w-5" />
-              <span className="hidden sm:inline">Cerrar Sesión</span>
-            </Button>
+          <header className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-gradient-to-r from-[#001BB7] to-purple-600">
+            <SidebarToggle />
+            <LogoutButton onClick={handleLogout} />
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto overflow-x-hidden">
             <AnimatePresence mode="wait">

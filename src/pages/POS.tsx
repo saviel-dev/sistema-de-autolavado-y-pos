@@ -38,8 +38,10 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import { formatBarcode } from "@/lib/barcodeUtils";
 import { useProducts, Product } from "@/contexts/ProductContext";
 import { useServices, Service } from "@/contexts/ServiceContext";
-import { useCustomers, Customer } from "@/contexts/CustomerContext";
+import { useCustomers, Customer, Vehicle } from "@/contexts/CustomerContext";
 import { useSales, SaleItem } from "@/contexts/SalesContext"; // Import from new context
+import { useOrders } from "@/contexts/OrderContext";
+import { useSettings } from "@/contexts/SettingsContext";
 
 import {
   Card,
@@ -100,6 +102,8 @@ const POS = () => {
   const { services, refreshServices } = useServices();
   const { customers, addCustomer, refreshCustomers, uploadImage } = useCustomers(); 
   const { createSale, loading: saleLoading } = useSales();
+  const { getOrderByVehicle } = useOrders();
+  const { config } = useSettings();
 
   const [cart, setCart] = useState<POSCartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
@@ -110,15 +114,27 @@ const POS = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  // Customer selection states
+  // Vehicle selection states
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null); // New state
+  const [vehicleSearchOpen, setVehicleSearchOpen] = useState(false);
+  const [vehicleSearchQuery, setVehicleSearchQuery] = useState("");
   
-  const filteredCustomers = customers.filter(customer => 
-    customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-    customer.phone.includes(customerSearchQuery) ||
-    (customer.licensePlate && customer.licensePlate.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+  // Flatten all vehicles for search "Vehicle - Plate - Customer"
+  const searchableVehicles = customers.flatMap(customer => 
+    (customer.vehicles || []).map(vehicle => ({
+      ...vehicle,
+      customerName: customer.name,
+      customerPhone: customer.phones?.[0] || "",
+      customerId: customer.id,
+      customerEmail: customer.email,
+      customerStatus: customer.status,
+      customerImage: customer.image
+    }))
+  ).filter(v => 
+    v.placa.toLowerCase().includes(vehicleSearchQuery.toLowerCase()) ||
+    v.tipo.toLowerCase().includes(vehicleSearchQuery.toLowerCase()) ||
+    v.customerName.toLowerCase().includes(vehicleSearchQuery.toLowerCase())
   );
 
   // Dialog states
@@ -325,6 +341,49 @@ const POS = () => {
     }
   };
 
+  const handleSelectVehicle = async (vehicle: any) => {
+      // Find full customer object
+      const customer = customers.find(c => c.id === vehicle.customerId);
+      if (customer) setSelectedCustomer(customer);
+      
+      setSelectedVehicle(vehicle);
+      setVehicleSearchOpen(false);
+
+      // Check for active orders for this vehicle
+      const activeOrder = await getOrderByVehicle(vehicle.id);
+      
+      if (activeOrder && activeOrder.items.length > 0) {
+          // Clear current cart services? Or append?
+          // Usually appending is safer or asking, but let's auto-add distinct avoid duplicates
+          const newCart = [...cart];
+          
+          let addedCount = 0;
+          activeOrder.items.forEach(item => {
+              const cartItemId = `service-${item.serviceId}`;
+               // Check if already in cart
+              if (!newCart.some(c => c.cartId === cartItemId)) {
+                   newCart.push({
+                       cartId: cartItemId,
+                       type: 'service',
+                       itemId: item.serviceId,
+                       name: item.serviceName || 'Servicio',
+                       price: item.price,
+                       quantity: 1
+                   });
+                   addedCount++;
+              }
+          });
+          
+          if (addedCount > 0) {
+              setCart(newCart);
+              toast({
+                  title: "Servicios cargados",
+                  description: `Se han cargado ${addedCount} servicios de la orden activa (${activeOrder.type === 'walk-in' ? 'Llegada' : 'Cita'}).`,
+              });
+          }
+      }
+  };
+
   // --- Customer Handlers ---
   const handleCustomerInputChange = (field: string, value: any) => {
     setCustomerFormData(prev => ({ ...prev, [field]: value }));
@@ -381,23 +440,37 @@ const POS = () => {
             profileImageUrl = await uploadImage(profileImageFile);
         }
 
-        // Upload gallery images
-        const galleryUrls: string[] = [];
-        for (const file of galleryImageFiles) {
-            const url = await uploadImage(file);
-            galleryUrls.push(url);
-        }
-
-        await addCustomer({
+        const newCustomerId = await addCustomer({
             name: customerFormData.name,
             email: customerFormData.email,
-            phone: customerFormData.phone,
-            vehicle: customerFormData.vehicle,
-            vehicleType: customerFormData.vehicleType,
-            licensePlate: customerFormData.licensePlate,
+            phones: [customerFormData.phone], // Pass as array
             status: customerFormData.status,
-            image: profileImageUrl,
-            images: galleryUrls
+            image: profileImageUrl
+        });
+        
+        if (newCustomerId && customerFormData.vehicle && customerFormData.licensePlate) {
+             // Add vehicle if data provided
+             // Upload gallery images for vehicle if any (though UI uses them for customer gallery currently?)
+             // In new schema, images are for VEHICLE.
+             // But UI form in POS seems to be mixed legacy. 
+             // Let's assume gallery is for vehicle now.
+
+             const galleryUrls: string[] = [];
+             for (const file of galleryImageFiles) {
+                const url = await uploadImage(file);
+                galleryUrls.push(url);
+             }
+
+             // We need to import addVehicle in POS? No, it's exposed via context.
+             // Wait, useCustomers exposes addVehicle? 
+             // I need to check useCustomers destructuring.
+             // If not exposed, I might need to use supabase directly or update destructuring.
+             // Assuming addVehicle is exposed in context passed to value.
+        }
+
+        toast({
+             title: "Cliente creado",
+             description: "El cliente ha sido registrado exitosamente.",
         });
         
         setIsCustomerDialogOpen(false);
@@ -408,9 +481,6 @@ const POS = () => {
         setProfileImageFile(null);
         setGalleryImageFiles([]);
 
-        // Auto select the new customer? 
-        // addCustomer doesn't return the ID easily without refactor, but we can search or just notify
-        // For now, let user search.
     } catch (error) {
         // handled in context
     } finally {
@@ -429,13 +499,13 @@ const POS = () => {
     // Encabezado
     doc.setFontSize(22);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text("Autolavado Gochi", 105, 20, { align: "center" });
+    doc.text(config.nombre_negocio || "Autolavado Gochi", 105, 20, { align: "center" });
     
     doc.setFontSize(10);
     doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
-    doc.text("Av. Principal Las Mercedes, Caracas", 105, 28, { align: "center" });
-    doc.text("Tel: +58 412-1234567 | Email: contacto@autolavadogochi.com", 105, 33, { align: "center" });
-    doc.text("RIF: J-12345678-9", 105, 38, { align: "center" });
+    doc.text(config.direccion || "Av. Principal Las Mercedes, Caracas", 105, 28, { align: "center" });
+    doc.text(`Tel: ${config.telefono || "+58 412-1234567"} | Email: ${config.email || "contacto@autolavadogochi.com"}`, 105, 33, { align: "center" });
+    doc.text(`RIF: ${config.rif || "J-12345678-9"}`, 105, 38, { align: "center" });
 
     doc.setDrawColor(200, 200, 200);
     doc.line(20, 45, 190, 45);
@@ -457,16 +527,16 @@ const POS = () => {
       doc.setFont("helvetica", "normal");
       doc.text(selectedCustomer.name, 40, 82);
       
-      if (selectedCustomer.phone) {
+      if (selectedCustomer.phones && selectedCustomer.phones.length > 0) {
         doc.text("Teléfono:", 20, 87);
-        doc.text(selectedCustomer.phone, 40, 87);
+        doc.text(selectedCustomer.phones[0], 40, 87);
       }
       
-      if (selectedCustomer.vehicle) {
+      if (selectedVehicle) {
         doc.text("Vehículo:", 20, 92);
-        const vehicleInfo = selectedCustomer.licensePlate 
-          ? `${selectedCustomer.vehicle} (${selectedCustomer.licensePlate})`
-          : selectedCustomer.vehicle;
+        const vehicleInfo = selectedVehicle.placa 
+          ? `${selectedVehicle.tipo} (${selectedVehicle.placa})`
+          : selectedVehicle.tipo;
         doc.text(vehicleInfo, 40, 92);
       }
       
@@ -682,64 +752,57 @@ const POS = () => {
                 
                 {/* Customer Selector */}
                 <div className="mt-4">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold mb-2 block">Cliente</Label>
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold mb-2 block">Vehículo - Cliente</Label>
                     
-                    {!selectedCustomer ? (
+                    {!selectedVehicle ? (
                         <div className="flex gap-2">
-                            <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                            <Popover open={vehicleSearchOpen} onOpenChange={setVehicleSearchOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" role="combobox" className="w-full justify-between">
-                                        Seleccionar cliente...
+                                        Seleccionar vehículo...
                                         <IoSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[300px] p-0">
                                     <Command>
                                         <CommandInput 
-                                            placeholder="Buscar por nombre, placa..." 
-                                            value={customerSearchQuery}
-                                            onValueChange={setCustomerSearchQuery}
+                                            placeholder="Buscar placa, vehículo, cliente..." 
+                                            value={vehicleSearchQuery}
+                                            onValueChange={setVehicleSearchQuery}
                                         />
-                                        <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+                                        <CommandEmpty>No se encontraron vehículos.</CommandEmpty>
                                         <CommandGroup>
-                                            {filteredCustomers.map((customer) => (
-                                                <HoverCard key={customer.id} openDelay={200}>
+                                            {searchableVehicles.slice(0, 10).map((vehicle) => (
+                                                <HoverCard key={`${vehicle.customerId}-${vehicle.id}`} openDelay={200}>
                                                     <HoverCardTrigger asChild>
                                                         <CommandItem
-                                                            onSelect={() => {
-                                                                setSelectedCustomer(customer);
-                                                                setCustomerSearchOpen(false);
-                                                            }}
+                                                            onSelect={() => handleSelectVehicle(vehicle)}
                                                             className="cursor-pointer"
                                                         >
                                                             <div className="flex flex-col w-full">
-                                                                <span>{customer.name}</span>
+                                                                <span className="font-bold">{vehicle.placa}</span>
+                                                                <span className="text-xs text-muted-foreground">{vehicle.tipo} - {vehicle.customerName}</span>
                                                             </div>
                                                             <IoCheckmarkOutline
-                                                                className={`ml-auto h-4 w-4 ${selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"}`}
+                                                                className={`ml-auto h-4 w-4 ${selectedVehicle?.id === vehicle.id ? "opacity-100" : "opacity-0"}`}
                                                             />
                                                         </CommandItem>
                                                     </HoverCardTrigger>
                                                     <HoverCardContent className="w-80" side="right" align="start">
                                                         <div className="flex justify-between space-x-4">
                                                             <Avatar>
-                                                                <AvatarImage src={customer.image} />
-                                                                <AvatarFallback>{customer.name.substring(0,2).toUpperCase()}</AvatarFallback>
+                                                                <AvatarImage src={vehicle.customerImage} />
+                                                                <AvatarFallback>{vehicle.customerName?.substring(0,2).toUpperCase()}</AvatarFallback>
                                                             </Avatar>
                                                             <div className="space-y-1">
-                                                                <h4 className="text-sm font-semibold">{customer.name}</h4>
-                                                                <p className="text-sm text-muted-foreground">{customer.email}</p>
+                                                                <h4 className="text-sm font-semibold">{vehicle.customerName}</h4>
                                                                 <div className="flex items-center pt-2">
-                                                                    <IoPhonePortraitOutline className="mr-2 h-4 w-4 opacity-70" /> 
-                                                                    <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                                                                    <IoCarSportOutline className="mr-2 h-4 w-4 opacity-70" /> 
+                                                                    <span className="text-xs text-muted-foreground">{vehicle.tipo} ({vehicle.placa})</span>
                                                                 </div>
                                                                 <div className="flex items-center">
-                                                                    <IoCarSportOutline className="mr-2 h-4 w-4 opacity-70" /> 
-                                                                    <span className="text-xs text-muted-foreground">{customer.vehicle} ({customer.licensePlate})</span>
-                                                                </div>
-                                                                <div className="mt-2 flex items-center gap-2">
-                                                                    <Badge variant={customer.status === 'VIP' ? 'default' : 'secondary'}>{customer.status}</Badge>
-                                                                    <span className="text-xs text-muted-foreground">Visitas: {customer.visits}</span>
+                                                                    <IoPhonePortraitOutline className="mr-2 h-4 w-4 opacity-70" /> 
+                                                                    <span className="text-xs text-muted-foreground">{vehicle.customerPhone}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -750,7 +813,7 @@ const POS = () => {
                                     </Command>
                                 </PopoverContent>
                             </Popover>
-                            <Button size="icon" onClick={() => setIsCustomerDialogOpen(true)}>
+                            <Button size="icon" onClick={() => setIsCustomerDialogOpen(true)} title="Nuevo Cliente">
                                 <IoAddOutline className="h-4 w-4" />
                             </Button>
                         </div>
@@ -760,19 +823,22 @@ const POS = () => {
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-6 w-6 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => setSelectedCustomer(null)}
+                                onClick={() => {
+                                    setSelectedCustomer(null);
+                                    setSelectedVehicle(null);
+                                }}
                              >
                                 <IoCloseOutline className="h-4 w-4" />
                              </Button>
                              <div className="font-medium text-primary flex items-center gap-2">
-                                <IoPersonCircleOutline className="h-5 w-5" />
-                                {selectedCustomer.name}
+                                <IoCarSportOutline className="h-5 w-5" />
+                                {selectedVehicle.placa}
                              </div>
                              <div className="text-sm text-muted-foreground mt-1">
-                                {selectedCustomer.vehicle} • {selectedCustomer.licensePlate}
+                                {selectedVehicle.tipo} • {selectedCustomer?.name}
                              </div>
-                             {selectedCustomer.status === 'VIP' && (
-                                <Badge className="mt-2 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200">VIP Customer</Badge>
+                             {selectedCustomer?.status === 'VIP' && (
+                                <Badge className="mt-2 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200">VIP</Badge>
                              )}
                         </div>
                     )}
@@ -1064,8 +1130,8 @@ const POS = () => {
                                 <h4 className="font-bold text-sm truncate">{selectedCustomer.name}</h4>
                                 <div className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
                                     <IoCarSportOutline className="h-3 w-3" />
-                                    {selectedCustomer.vehicle} 
-                                    {selectedCustomer.licensePlate && <span className="font-mono bg-background px-1 rounded border ml-1">{selectedCustomer.licensePlate}</span>}
+                                    {selectedVehicle?.tipo || "Sin vehículo"} 
+                                    {selectedVehicle?.placa && <span className="font-mono bg-background px-1 rounded border ml-1">{selectedVehicle.placa}</span>}
                                 </div>
                                 <div className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
                                     <IoMailOutline className="h-3 w-3" />

@@ -18,6 +18,7 @@ import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import Workers from "./pages/Workers";
 import NotFound from "./pages/NotFound";
 import BarcodeTestPanel from "./pages/BarcodeTestPanel";
 import { ProductProvider } from "./contexts/ProductContext";
@@ -28,6 +29,8 @@ import { CustomerProvider } from "./contexts/CustomerContext";
 import { ServiceProvider } from "@/contexts/ServiceContext";
 import { OrderProvider } from "./contexts/OrderContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
+import { WorkerProvider } from "./contexts/WorkerContext";
 
 const queryClient = new QueryClient();
 
@@ -58,8 +61,10 @@ const App = () => {
             <MovementProvider>
               <CustomerProvider>
               <ServiceProvider>
-                <SalesProvider>
-                  <OrderProvider>
+                  <SettingsProvider>
+                  <SalesProvider>
+                    <WorkerProvider>
+                    <OrderProvider>
                     <TooltipProvider>
                       <Toaster />
                       <Sonner />
@@ -78,6 +83,7 @@ const App = () => {
                             <Route path="/customers" element={<Customers />} />
                             <Route path="/reports" element={<Reports />} />
                             <Route path="/settings" element={<Settings />} />
+                            <Route path="/workers" element={<Workers />} />
                             {import.meta.env.DEV && (
                               <Route path="/barcode-test" element={<BarcodeTestPanel />} />
                             )}
@@ -87,7 +93,9 @@ const App = () => {
                       </BrowserRouter>
                     </TooltipProvider>
                   </OrderProvider>
-                </SalesProvider>
+                    </WorkerProvider>
+                  </SalesProvider>
+                  </SettingsProvider>
               </ServiceProvider>
             </CustomerProvider>
           </MovementProvider>

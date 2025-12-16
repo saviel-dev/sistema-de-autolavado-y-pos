@@ -1,0 +1,62 @@
+/* --- Variables de Color (Flat Design) --- */
+:root {
+  /* Rojo plano (Alizarin) */
+  --logout-primary-color: #e74c3c;
+  /* Rojo un poco más oscuro para el hover */
+  --logout-hover-color: #c0392b;
+  /* Color de texto blanco */
+  --logout-text-color: #ffffff;
+}
+
+/* --- Estilos del Botón --- */
+.logout-btn {
+  background-color: var(--logout-primary-color);
+  color: var(--logout-text-color);
+  border: none;
+  /* Padding generoso para mejor clickabilidad */
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px; /* Bordes ligeramente redondeados */
+  cursor: pointer;
+  
+  /* Flexbox para alinear icono y texto */
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Espacio entre icono y texto */
+  
+  /* Transiciones suaves */
+  transition: background-color 0.3s ease, transform 0.1s ease, opacity 0.3s ease;
+  
+  /* Sombra muy sutil (flat design permite sombras planas, no difusas) */
+  box-shadow: 0 4px 0 rgba(0,0,0,0.05);
+
+  /* Ensure button appearance is reset */
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Estado Hover (Pasar el mouse) */
+.logout-btn:hover {
+  background-color: var(--logout-hover-color);
+}
+
+/* Estado Active (Click presionado) */
+.logout-btn:active {
+  transform: translateY(2px); /* Efecto de presionar */
+  box-shadow: 0 2px 0 rgba(0,0,0,0.05);
+}
+
+/* Disabled state for loading */
+.logout-btn:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Icon styling adjustments for react-icons to match ion-icon size */
+.logout-btn svg {
+  font-size: 1.2rem; /* Icono ligeramente más grande que el texto */
+  width: 1.2rem;
+  height: 1.2rem;
+}

@@ -45,7 +45,9 @@ interface OrderContextType {
   createOrder: (order: CreateOrderDTO) => Promise<boolean>;
   updateOrder: (id: number, updates: Partial<Order>) => Promise<boolean>;
   updateOrderStatus: (id: number, status: Order['status']) => Promise<boolean>;
+
   deleteOrder: (id: number) => Promise<boolean>;
+  getOrderByVehicle: (vehicleId: number) => Promise<Order | null>; // New method
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -230,6 +232,81 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const getOrderByVehicle = async (vehicleId: number): Promise<Order | null> => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Find orders for this vehicle that are active (Pendiente/En Proceso) 
+        // AND match today's date (either created_at or schedule date)
+        const { data, error } = await supabase
+            .from('pedidos')
+            .select(`
+              *,
+              clientes (
+                nombre,
+                imagen_url
+              ),
+              vehiculos (
+                id,
+                placa,
+                tipo
+              ),
+              detalle_pedidos (
+                id,
+                servicio_id,
+                precio_unitario,
+                servicios (
+                  nombre
+                )
+              )
+            `)
+            .eq('vehiculo_id', vehicleId)
+            .in('estado', ['Pendiente', 'En Proceso', 'Confirmada']) // Include Confirmada for appointments
+            .gte('created_at', `${today}T00:00:00`)
+            .lte('created_at', `${today}T23:59:59`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) throw error;
+        
+        if (!data) return null;
+
+        // Check if it's an appointment (future date) that matches today
+        if (data.tipo === 'appointment' && data.fecha_programada !== today) {
+             // If appointment date is not today, we might skip it or handle logic differently.
+             // For now simple logic: if it's strictly for today.
+             // Usually operations work on current day.
+        }
+
+        return {
+          id: data.id,
+          customerId: data.cliente_id,
+          customerName: data.clientes?.nombre || 'Cliente Desconocido',
+          customerImage: data.clientes?.imagen_url,
+          vehicleId: data.vehiculo_id || data.vehiculos?.id,
+          vehiclePlate: data.vehiculos?.placa,
+          vehicleType: data.vehiculos?.tipo,
+          type: data.tipo,
+          status: data.estado,
+          date: data.fecha_programada,
+          time: data.hora_programada,
+          total: data.total,
+          notes: data.notas,
+          createdAt: data.created_at,
+          items: data.detalle_pedidos.map((detail: any) => ({
+            id: detail.id,
+            serviceId: detail.servicio_id,
+            serviceName: detail.servicios?.nombre || 'Servicio',
+            price: detail.precio_unitario,
+          }))
+        };
+    } catch (error) {
+        console.error("Error getting order by vehicle", error);
+        return null;
+    }
+  };
+
   return (
     <OrderContext.Provider value={{ 
       orders, 
@@ -238,7 +315,9 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       createOrder, 
       updateOrder, 
       updateOrderStatus,
-      deleteOrder 
+
+      deleteOrder,
+      getOrderByVehicle // Export method
     }}>
       {children}
     </OrderContext.Provider>

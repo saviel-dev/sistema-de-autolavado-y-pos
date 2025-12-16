@@ -1,238 +1,43 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { 
-  IoSettingsOutline, 
-  IoTimeOutline, 
-  IoShieldCheckmarkOutline,
-  IoLogoInstagram,
-  IoLogoFacebook,
-  IoLogoWhatsapp,
   IoSaveOutline,
   IoBusinessOutline,
-  IoShareSocialOutline,
-  IoCheckmarkCircleOutline,
-  IoWarningOutline
+  IoShareSocialOutline
 } from "react-icons/io5";
-import { useToast } from "@/components/ui/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import { supabase } from "@/lib/supabase";
 
-interface AppConfig {
-  id?: number;
-  nombre_negocio: string;
-  rif: string;
-  telefono: string;
-  email: string;
-  direccion: string;
-  instagram: string;
-  facebook: string;
-  whatsapp: string;
-  hora_apertura: string;
-  hora_cierre: string;
-  dias_laborables: string[];
-}
+import { useSettings, AppConfig } from "@/contexts/SettingsContext";
 
 const Settings = () => {
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showLogoutSuccess, setShowLogoutSuccess] = useState(false);
+  const { config, loading: fetching, updateConfig } = useSettings();
+  const [saving, setSaving] = useState(false);
+  
+  const [localConfig, setLocalConfig] = useState<AppConfig>(config);
 
-  const [config, setConfig] = useState<AppConfig>({
-    nombre_negocio: '',
-    rif: '',
-    telefono: '',
-    email: '',
-    direccion: '',
-    instagram: '',
-    facebook: '',
-    whatsapp: '',
-    hora_apertura: '08:00',
-    hora_cierre: '18:00',
-    dias_laborables: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-  });
-
-  const [passwordData, setPasswordData] = useState({
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [updatingPassword, setUpdatingPassword] = useState(false);
-
-  // ... fetchConfig ...
-
-  const handlePasswordUpdate = async () => {
-    if (!passwordData.newPassword || !passwordData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Por favor complete todos los campos de contraseña.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Las contraseñas no coinciden.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-        toast({
-          title: "Error",
-          description: "La contraseña debe tener al menos 6 caracteres.",
-          variant: "destructive",
-        });
-        return;
-    }
-
-    setUpdatingPassword(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "¡Éxito!",
-        description: "Tu contraseña ha sido actualizada correctamente.",
-      });
-      setPasswordData({ newPassword: '', confirmPassword: '' });
-    } catch (error) {
-      console.error('Error updating password:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la contraseña. Intenta nuevamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdatingPassword(false);
-    }
-  };
-
-  const fetchConfig = async () => {
-    try {
-      setFetching(true);
-      const { data, error } = await supabase
-        .from('configuracion')
-        .select('*')
-        .single();
-      
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "Relation not found" or "Row not found"
-        throw error;
-      }
-
-      if (data) {
-        setConfig({
-          ...data,
-          dias_laborables: data.dias_laborables || []
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching config:', error);
-      toast({
-        title: "Nota",
-        description: "No se pudo cargar la configuración. Asegúrate de haber ejecutado el script SQL.",
-        variant: "destructive",
-      });
-    } finally {
-      setFetching(false);
-    }
-  };
-
+  // Sync local config when context config loads
   useEffect(() => {
-    fetchConfig();
-  }, []);
+    if (config) {
+        setLocalConfig(config);
+    }
+  }, [config]);
 
   const handleChange = (field: keyof AppConfig, value: any) => {
-    setConfig(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleWorkDayToggle = (day: string) => {
-    setConfig(prev => {
-      const exists = prev.dias_laborables.includes(day);
-      if (exists) {
-        return { ...prev, dias_laborables: prev.dias_laborables.filter(d => d !== day) };
-      } else {
-        return { ...prev, dias_laborables: [...prev.dias_laborables, day] };
-      }
-    });
+    setLocalConfig(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
-    setLoading(true);
+    setSaving(true);
     try {
-      // Upsert logic: if id=1 exists update, else insert
-      const { error } = await supabase
-        .from('configuracion')
-        .upsert({
-          id: 1, // Force ID 1 for singleton config
-          ...config,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Configuración guardada",
-        description: "Los cambios han sido aplicados correctamente.",
-      });
+      await updateConfig(localConfig);
     } catch (error) {
-      console.error('Error saving config:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron guardar los cambios.",
-        variant: "destructive",
-      });
+      // Toast already handled in context
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogoutClick = () => {
-    setShowLogoutConfirm(true);
-  };
-
-  const handleLogoutConfirm = async () => {
-    setShowLogoutConfirm(false);
-    try {
-      await supabase.auth.signOut();
-      setShowLogoutSuccess(true);
-      // Optional: Redirect to login or handled by App auth state listener
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: "Error",
-        description: "Error al cerrar sesión.",
-        variant: "destructive",
-      });
+      setSaving(false);
     }
   };
 
@@ -263,54 +68,6 @@ const Settings = () => {
     >
       <Toaster />
       
-      {/* Logout Confirmation Modal */}
-      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <IoWarningOutline className="h-6 w-6" />
-              ¿Estás seguro?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción cerrará la sesión en todos los dispositivos donde tu cuenta esté activa. Tendrás que volver a iniciar sesión en cada uno de ellos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleLogoutConfirm}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-            >
-              Sí, cerrar sesiones
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Success Modal */}
-      <Dialog open={showLogoutSuccess} onOpenChange={setShowLogoutSuccess}>
-        <DialogContent className="sm:max-w-md text-center">
-          <DialogHeader>
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mb-4">
-              <IoCheckmarkCircleOutline className="h-10 w-10 text-green-600" />
-            </div>
-            <DialogTitle className="text-center text-xl">¡Sesiones Cerradas!</DialogTitle>
-            <DialogDescription className="text-center">
-              Se ha cerrado la sesión exitosamente en todos los dispositivos.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="sm:justify-center">
-            <Button 
-              type="button" 
-              className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
-              onClick={() => setShowLogoutSuccess(false)}
-            >
-              Entendido
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
           Configuración
@@ -320,298 +77,81 @@ const Settings = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-6">
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 -mx-4 px-4 md:mx-0 md:px-0">
-          <TabsList className="w-full justify-start md:justify-center p-1 h-auto bg-muted/50 rounded-xl overflow-x-auto flex-nowrap">
-            <TabsTrigger 
-              value="general" 
-              className="flex-1 min-w-[120px] py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-300"
-            >
-              <div className="flex items-center gap-2">
-                <IoSettingsOutline className="h-4 w-4" />
-                <span>General</span>
-              </div>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="operations" 
-              className="flex-1 min-w-[120px] py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-300"
-            >
-              <div className="flex items-center gap-2">
-                <IoTimeOutline className="h-4 w-4" />
-                <span>Operaciones</span>
-              </div>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="security" 
-              className="flex-1 min-w-[120px] py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-300"
-            >
-              <div className="flex items-center gap-2">
-                <IoShieldCheckmarkOutline className="h-4 w-4" />
-                <span>Seguridad</span>
-              </div>
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <IoBusinessOutline className="text-primary" />
+              Información del Negocio
+            </CardTitle>
+            <CardDescription>
+              Datos principales de tu autolavado
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="nombre_negocio">Nombre del Negocio</Label>
+              <Input 
+                id="nombre_negocio" 
+                value={localConfig.nombre_negocio || ''} 
+                onChange={(e) => handleChange('nombre_negocio', e.target.value)}
+                placeholder="Ej. Autolavado Gochi"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rif">RIF / Identificación</Label>
+              <Input 
+                id="rif" 
+                value={localConfig.rif || ''} 
+                onChange={(e) => handleChange('rif', e.target.value)}
+                placeholder="J-12345678-9"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="direccion">Dirección</Label>
+              <Input 
+                id="direccion" 
+                value={localConfig.direccion || ''} 
+                onChange={(e) => handleChange('direccion', e.target.value)}
+                placeholder="Dirección del local"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* GENERAL SETTINGS */}
-        <TabsContent value="general" className="space-y-6">
-          <motion.div variants={itemVariants} className="grid gap-6 md:grid-cols-2">
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-br from-card to-muted/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                    <IoBusinessOutline className="h-6 w-6" />
-                  </div>
-                  Información del Negocio
-                </CardTitle>
-                <CardDescription>Datos básicos y de contacto</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="business-name">Nombre del Negocio</Label>
-                  <Input 
-                    id="business-name" 
-                    value={config.nombre_negocio} 
-                    onChange={(e) => handleChange('nombre_negocio', e.target.value)}
-                    placeholder="Ej. Autolavado Gochi" 
-                    className="bg-background/50" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="business-rif">RIF / Identificación</Label>
-                  <Input 
-                    id="business-rif" 
-                    value={config.rif} 
-                    onChange={(e) => handleChange('rif', e.target.value)}
-                    placeholder="Ej. J-12345678-9" 
-                    className="bg-background/50" 
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="business-phone">Teléfono</Label>
-                    <Input 
-                      id="business-phone" 
-                      value={config.telefono} 
-                      onChange={(e) => handleChange('telefono', e.target.value)}
-                      placeholder="Ej. 0412-1234567" 
-                      className="bg-background/50" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="business-email">Email</Label>
-                    <Input 
-                      id="business-email" 
-                      type="email" 
-                      value={config.email} 
-                      onChange={(e) => handleChange('email', e.target.value)}
-                      placeholder="Ej. contacto@gochi.com" 
-                      className="bg-background/50" 
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="business-address">Dirección Física</Label>
-                  <Input 
-                    id="business-address" 
-                    value={config.direccion} 
-                    onChange={(e) => handleChange('direccion', e.target.value)}
-                    placeholder="Ej. Av. Principal, Local 123" 
-                    className="bg-background/50" 
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-br from-card to-muted/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
-                    <IoShareSocialOutline className="h-6 w-6" />
-                  </div>
-                  Redes Sociales
-                </CardTitle>
-                <CardDescription>Conecta con tus clientes</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="instagram" className="flex items-center gap-2 text-pink-600 font-medium">
-                    <IoLogoInstagram className="h-5 w-5" /> Instagram
-                  </Label>
-                  <Input 
-                    id="instagram" 
-                    value={config.instagram} 
-                    onChange={(e) => handleChange('instagram', e.target.value)}
-                    placeholder="@usuario" 
-                    className="bg-background/50 border-pink-100 focus:border-pink-300 focus:ring-pink-200" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="facebook" className="flex items-center gap-2 text-blue-600 font-medium">
-                    <IoLogoFacebook className="h-5 w-5" /> Facebook
-                  </Label>
-                  <Input 
-                    id="facebook" 
-                    value={config.facebook} 
-                    onChange={(e) => handleChange('facebook', e.target.value)}
-                    placeholder="/pagina" 
-                    className="bg-background/50 border-blue-100 focus:border-blue-300 focus:ring-blue-200"  
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="whatsapp" className="flex items-center gap-2 text-green-600 font-medium">
-                    <IoLogoWhatsapp className="h-5 w-5" /> WhatsApp Business
-                  </Label>
-                  <Input 
-                    id="whatsapp" 
-                    value={config.whatsapp} 
-                    onChange={(e) => handleChange('whatsapp', e.target.value)}
-                    placeholder="58..." 
-                    className="bg-background/50 border-green-100 focus:border-green-300 focus:ring-green-200" 
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </TabsContent>
-
-        {/* OPERATIONS SETTINGS */}
-        <TabsContent value="operations" className="space-y-6">
-          <motion.div variants={itemVariants}>
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-br from-card to-muted/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500">
-                    <IoTimeOutline className="h-6 w-6" />
-                  </div>
-                  Horarios de Atención
-                </CardTitle>
-                <CardDescription>Define cuándo está abierto tu negocio</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="opening-time" className="text-base">Hora de Apertura</Label>
-                    <div className="relative">
-                      <Input 
-                        id="opening-time" 
-                        type="time" 
-                        value={config.hora_apertura}
-                        onChange={(e) => handleChange('hora_apertura', e.target.value)}
-                        className="text-lg p-6 bg-background/50 text-center font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="closing-time" className="text-base">Hora de Cierre</Label>
-                    <div className="relative">
-                      <Input 
-                        id="closing-time" 
-                        type="time" 
-                        value={config.hora_cierre}
-                        onChange={(e) => handleChange('hora_cierre', e.target.value)}
-                        className="text-lg p-6 bg-background/50 text-center font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3 pt-4 border-t">
-                  <Label className="text-base">Días Laborables</Label>
-                  <div className="flex flex-wrap gap-3">
-                    {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => {
-                      const isActive = config.dias_laborables?.includes(day);
-                      return (
-                        <motion.div
-                          key={day}
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Button 
-                            variant={isActive ? "default" : "outline"}
-                            onClick={() => handleWorkDayToggle(day)}
-                            className={`rounded-full w-12 h-12 p-0 font-medium ${
-                              isActive ? 'bg-primary shadow-md shadow-primary/30' : 'border-dashed'
-                            }`}
-                          >
-                            {day}
-                          </Button>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    * Los días marcados en azul son laborables
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </TabsContent>
-
-        {/* SECURITY SETTINGS */}
-        <TabsContent value="security" className="space-y-6">
-          <motion.div variants={itemVariants}>
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-br from-card to-muted/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
-                    <IoShieldCheckmarkOutline className="h-6 w-6" />
-                  </div>
-                  Seguridad de la Cuenta
-                </CardTitle>
-                <CardDescription>Protege tu acceso al sistema</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="max-w-md space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">Nueva Contraseña</Label>
-                    <Input 
-                      id="new-password" 
-                      type="password" 
-                      placeholder="Ingresa la nueva contraseña" 
-                      className="bg-background/50"
-                      value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
-                    <Input 
-                      id="confirm-password" 
-                      type="password" 
-                      placeholder="Repite la nueva contraseña" 
-                      className="bg-background/50"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    />
-                  </div>
-                  <Button 
-                    onClick={handlePasswordUpdate}
-                    disabled={updatingPassword || !passwordData.newPassword}
-                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md shadow-red-500/20"
-                  >
-                    {updatingPassword ? "Actualizando..." : "Actualizar Contraseña"}
-                  </Button>
-                </div>
-                
-                <div className="pt-6 border-t flex flex-col md:flex-row gap-4 justify-between items-center">
-                  <p className="text-sm text-muted-foreground">
-                    ¿Detectas actividad sospechosa?
-                  </p>
-                  <Button 
-                    variant="destructive" 
-                    className="w-full md:w-auto shadow-md shadow-destructive/20"
-                    onClick={handleLogoutClick}
-                  >
-                    Cerrar Sesión en Todos los Dispositivos
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <IoShareSocialOutline className="text-primary" />
+              Contacto
+            </CardTitle>
+            <CardDescription>
+              Información de contacto para tus clientes
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="telefono">Teléfono</Label>
+              <Input 
+                id="telefono" 
+                value={localConfig.telefono || ''} 
+                onChange={(e) => handleChange('telefono', e.target.value)}
+                placeholder="0412-1234567"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo Electrónico</Label>
+              <Input 
+                id="email" 
+                type="email"
+                value={localConfig.email || ''} 
+                onChange={(e) => handleChange('email', e.target.value)}
+                placeholder="contacto@ejemplo.com"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       <motion.div 
         className="fixed bottom-6 right-6 z-50"
@@ -621,12 +161,12 @@ const Settings = () => {
       >
         <Button 
           onClick={handleSave} 
-          disabled={loading}
+          disabled={saving}
           size="lg"
           className="rounded-full h-14 px-8 gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-xl shadow-primary/30 transition-all duration-300 hover:scale-105"
         >
           <IoSaveOutline className="h-6 w-6" />
-          {loading ? "Guardando..." : "Guardar Cambios"}
+          {saving ? "Guardando..." : "Guardar Cambios"}
         </Button>
       </motion.div>
       

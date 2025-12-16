@@ -26,7 +26,7 @@ export interface Customer {
 interface CustomerContextType {
   customers: Customer[];
   loading: boolean;
-  addCustomer: (customer: Omit<Customer, 'id' | 'visits' | 'vehicles'>) => Promise<void>;
+  addCustomer: (customer: Omit<Customer, 'id' | 'visits' | 'vehicles'>) => Promise<number | null>; // Returns ID
   updateCustomer: (id: number, updates: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: number) => Promise<void>;
   refreshCustomers: () => Promise<void>;
@@ -123,7 +123,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const addCustomer = async (customerData: Omit<Customer, 'id' | 'visits' | 'vehicles'>) => {
+  const addCustomer = async (customerData: Omit<Customer, 'id' | 'visits' | 'vehicles'>): Promise<number | null> => {
     try {
       const dbData = {
         nombre: customerData.name,
@@ -134,16 +134,17 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
         visitas: 0
       };
 
-      const { error } = await supabase.from('clientes').insert([dbData]);
+      const { data, error } = await supabase.from('clientes').insert([dbData]).select().single();
 
       if (error) throw error;
 
       toast.success('Cliente agregado correctamente');
       await fetchCustomers();
+      return data.id;
     } catch (error: any) {
       console.error('Error adding customer:', error);
       toast.error('Error al agregar cliente: ' + error.message);
-      throw error;
+      return null;
     }
   };
 
