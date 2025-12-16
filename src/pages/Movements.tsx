@@ -41,52 +41,60 @@ const Movements = () => {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden border-none shadow-md">
+        <CardHeader className="bg-white pb-4">
           <CardTitle>Historial de Movimientos</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Ítem</TableHead>
-                <TableHead>Tipo de Ítem</TableHead>
-                <TableHead>Cantidad</TableHead>
-                <TableHead>Razón</TableHead>
-                <TableHead>Tipo Mov.</TableHead>
+            <TableHeader className="bg-purple-600 hover:bg-purple-600">
+              <TableRow className="hover:bg-purple-600 border-none">
+                <TableHead className="text-white font-semibold">Fecha</TableHead>
+                <TableHead className="text-white font-semibold">Ítem</TableHead>
+                <TableHead className="text-center text-white font-semibold">Tipo de Ítem</TableHead>
+                <TableHead className="text-center text-white font-semibold">Cantidad</TableHead>
+                <TableHead className="text-white font-semibold">Razón</TableHead>
+                <TableHead className="text-center text-white font-semibold">Tipo Mov.</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">Cargando...</TableCell>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Cargando movimientos...</TableCell>
                 </TableRow>
               ) : filteredMovements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">No hay movimientos registrados</TableCell>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay movimientos registrados</TableCell>
                 </TableRow>
               ) : (
-                filteredMovements.map((movement) => (
-                  <TableRow key={movement.id}>
-                    <TableCell>
+                filteredMovements.map((movement, index) => (
+                  <TableRow key={movement.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <TableCell className="font-medium text-slate-700">
                       {movement.created_at 
-                        ? format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: es })
+                        ? format(new Date(movement.created_at), 'dd MMM yyyy, HH:mm', { locale: es })
                         : '-'}
                     </TableCell>
-                    <TableCell className="font-medium">{movement.item_name}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${movement.item_type === 'product' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                    <TableCell className="font-medium text-slate-800">{movement.item_name}</TableCell>
+                    <TableCell className="text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        movement.item_type === 'product' 
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                          : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                      }`}>
                         {movement.item_type === 'product' ? 'Producto' : 'Insumo'}
                       </span>
                     </TableCell>
-                    <TableCell>{movement.quantity}</TableCell>
-                    <TableCell>{movement.reason}</TableCell>
-                    <TableCell>
-                         <span className={`flex items-center gap-1 ${movement.type === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                            {movement.type === 'entrada' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
-                            {movement.type === 'entrada' ? 'Entrada' : 'Salida'}
-                         </span>
+                    <TableCell className="text-center font-bold text-slate-700">{movement.quantity}</TableCell>
+                    <TableCell className="text-slate-600 max-w-[200px] truncate" title={movement.reason}>{movement.reason}</TableCell>
+                    <TableCell className="text-center">
+                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold border ${
+                         movement.type === 'entrada' 
+                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                           : 'bg-rose-50 text-rose-700 border-rose-200'
+                       }`}>
+                          {movement.type === 'entrada' ? <ArrowDownLeft className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                          {movement.type === 'entrada' ? 'ENTRADA' : 'SALIDA'}
+                       </span>
                     </TableCell>
                   </TableRow>
                 ))
@@ -100,3 +108,4 @@ const Movements = () => {
 };
 
 export default Movements;
+// Forced update

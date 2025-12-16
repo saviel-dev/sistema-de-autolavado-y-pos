@@ -193,13 +193,13 @@ const Consumables = () => {
       {/* Table Content */}
       <div className="rounded-md border bg-card shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead>Nombre / Descripción</TableHead>
-              <TableHead className="text-center">Stock / Unidad</TableHead>
-              <TableHead className="text-center">Costo</TableHead>
-              <TableHead className="text-center">Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+          <TableHeader className="bg-purple-600 hover:bg-purple-600">
+            <TableRow className="hover:bg-purple-600 border-none">
+              <TableHead className="text-white font-semibold">Nombre / Descripción</TableHead>
+              <TableHead className="text-center text-white font-semibold">Stock / Unidad</TableHead>
+              <TableHead className="text-center text-white font-semibold">Costo</TableHead>
+              <TableHead className="text-center text-white font-semibold">Estado</TableHead>
+              <TableHead className="text-right text-white font-semibold">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

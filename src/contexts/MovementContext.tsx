@@ -32,16 +32,31 @@ export const MovementProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const { data, error } = await supabase
         .from('movimientos')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select(`
+          *,
+          productos (
+            nombre
+          )
+        `)
+        .order('fecha', { ascending: false });
 
       if (error) {
-        // Silently fail if table doesn't exist yet to avoid crashing app, but log it
-        console.warn('Error fetching movements (table might not exist yet):', error);
+        console.warn('Error fetching movements:', error);
         return;
       }
 
-      setMovements(data || []);
+      const mappedMovements: Movement[] = data.map((m: any) => ({
+        id: m.id,
+        created_at: m.fecha,
+        item_id: m.producto_id,
+        item_type: 'product', // Currently table only supports products
+        item_name: m.productos?.nombre || 'Producto desconocido',
+        type: m.tipo,
+        quantity: m.cantidad,
+        reason: m.motivo,
+      }));
+
+      setMovements(mappedMovements);
     } catch (error) {
       console.error('Error fetching movements:', error);
     } finally {
