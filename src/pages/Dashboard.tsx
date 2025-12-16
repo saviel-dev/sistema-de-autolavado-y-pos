@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { 
   IoCarSportOutline, 
   IoCalendarOutline, 
@@ -8,10 +9,12 @@ import {
   IoTrendingUpOutline,
   IoCheckmarkCircle,
   IoTime,
-  IoAlertCircle
+  IoAlertCircle,
+  IoHelpCircleOutline
 } from "react-icons/io5";
 import { useSales } from "@/contexts/SalesContext";
 import { useOrders } from "@/contexts/OrderContext";
+import { useTour } from "@/hooks/useTour";
 
 interface DolarData {
   promedio: number;
@@ -31,6 +34,7 @@ const formatDate = (dateString: string) => {
 const Dashboard = () => {
   const { sales } = useSales();
   const { orders } = useOrders();
+  const { startTour } = useTour();
   const [dolarData, setDolarData] = useState<DolarData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,9 +138,20 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Resumen general de operaciones</p>
+      <div className="flex items-start justify-between gap-4" data-tour="dashboard-header">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Resumen general de operaciones</p>
+        </div>
+        <Button 
+          onClick={startTour}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2 shadow-sm hover:shadow-md transition-all hover:scale-105"
+        >
+          <IoHelpCircleOutline className="h-5 w-5" />
+          <span className="hidden sm:inline">¿Cómo usar?</span>
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

@@ -101,9 +101,11 @@ const Login = () => {
           className="mb-8"
         >
           <div className="flex items-center gap-3 mb-2">
-            <div className="bg-indigo-600 text-white p-2 rounded-md shadow-sm">
-              <IoCarSportOutline className="text-xl" />
-            </div>
+            <img 
+              src="/img/logo.png" 
+              alt="Logo" 
+              className="h-12 w-12 object-contain"
+            />
             <h2 className="text-2xl font-semibold tracking-tight text-gray-800">
               AutoLavado <span className="text-indigo-600">Gochi</span>
             </h2>
