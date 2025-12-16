@@ -91,6 +91,7 @@ const Orders = () => {
   const [formData, setFormData] = useState({
     orderType: "walk-in" as "walk-in" | "appointment",
     customerId: 0,
+    vehicleId: 0, 
     customerName: "",
     customerVehicle: "",
     services: [] as number[],
@@ -108,15 +109,22 @@ const Orders = () => {
     }));
   };
 
-  const handleCustomerSelect = (customerIdStr: string) => {
+  const handleVehicleSelect = (value: string) => {
+    // Value format: "customerId|vehicleId"
+    const [customerIdStr, vehicleIdStr] = value.split("|");
     const customerId = parseInt(customerIdStr);
+    const vehicleId = parseInt(vehicleIdStr);
+
     const customer = customers.find((c) => c.id === customerId);
-    if (customer) {
+    const vehicle = customer?.vehicles?.find((v) => v.id === vehicleId);
+
+    if (customer && vehicle) {
       setFormData((prev) => ({
         ...prev,
         customerId: customer.id,
+        vehicleId: vehicle.id,
         customerName: customer.name,
-        customerVehicle: customer.vehicle,
+        customerVehicle: `${vehicle.tipo} - ${vehicle.placa}`,
       }));
     }
   };
@@ -168,6 +176,7 @@ const Orders = () => {
     setFormData({
       orderType: type,
       customerId: 0,
+      vehicleId: 0,
       customerName: "",
       customerVehicle: "",
       services: [],
@@ -185,8 +194,9 @@ const Orders = () => {
     setFormData({
       orderType: order.type,
       customerId: order.customerId,
+      vehicleId: order.vehicleId || 0,
       customerName: order.customerName,
-      customerVehicle: order.items[0]?.serviceName ? "" : "", // Minor potential issue, but context handles vehicle display
+      customerVehicle: order.vehicleType && order.vehiclePlate ? `${order.vehicleType} - ${order.vehiclePlate}` : "",
       services: order.items.map(i => i.serviceId),
       serviceNames: order.items.map(i => i.serviceName || ''),
       status: order.status,
@@ -254,6 +264,7 @@ const Orders = () => {
     } else {
         await createOrder({
             customerId: formData.customerId,
+            vehicleId: formData.vehicleId,
             type: formData.orderType,
             status: formData.orderType === 'walk-in' ? 'En Proceso' : 'Confirmada', // Default status logic
             date: formData.orderType === 'appointment' ? formData.date : undefined,
@@ -327,7 +338,16 @@ const Orders = () => {
           </div>
           <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1">
             <IoCarSportOutline className="h-3 w-3" />
-            <span>{order.customerVehicle}</span>
+            <span>
+              {order.vehiclePlate ? (
+                <>
+                  <span className="font-mono font-medium">{order.vehiclePlate}</span>
+                  {order.vehicleType && <span className="text-muted-foreground/70"> - {order.vehicleType}</span>}
+                </>
+              ) : (
+                <span className="italic">Vehículo no especificado</span>
+              )}
+            </span>
           </p>
         </div>
       </div>
@@ -468,26 +488,28 @@ const Orders = () => {
               <div className="grid gap-4 p-6 max-h-[calc(90vh-200px)] overflow-y-auto">
                 {/* Cliente */}
                 <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
-                  <Label htmlFor="customer" className="md:text-right">
-                    Cliente *
+                  <Label htmlFor="vehicle" className="md:text-right">
+                    Vehículo *
                   </Label>
                   <Select
-                    value={formData.customerId.toString()}
-                    onValueChange={handleCustomerSelect}
-                    disabled={!!editingId} // Disable customer change in edit for simplicity
+                    value={formData.vehicleId ? `${formData.customerId}|${formData.vehicleId}` : ""}
+                    onValueChange={handleVehicleSelect}
+                    disabled={!!editingId}
                   >
                     <SelectTrigger className="md:col-span-3">
-                      <SelectValue placeholder="Seleccionar cliente" />
+                      <SelectValue placeholder="Seleccionar vehículo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem
-                          key={customer.id}
-                          value={customer.id.toString()}
-                        >
-                          {customer.name} - {customer.vehicle}
-                        </SelectItem>
-                      ))}
+                      {customers.flatMap((customer) => 
+                        (customer.vehicles || []).map((vehicle) => (
+                          <SelectItem
+                            key={`${customer.id}-${vehicle.id}`}
+                            value={`${customer.id}|${vehicle.id}`}
+                          >
+                            {customer.name} - {vehicle.placa} - {vehicle.tipo}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

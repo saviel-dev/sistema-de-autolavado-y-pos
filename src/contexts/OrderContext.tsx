@@ -14,7 +14,9 @@ export interface Order {
   customerId: number;
   customerName: string;
   customerImage?: string;
-  customerVehicle?: string;
+  vehicleId?: number; // New field
+  vehiclePlate?: string; // New field
+  vehicleType?: string; // New field
   type: 'walk-in' | 'appointment';
   status: 'Pendiente' | 'Confirmada' | 'En Proceso' | 'Completada' | 'Cancelada';
   date?: string; // Scheduled date for appointments
@@ -27,6 +29,7 @@ export interface Order {
 
 interface CreateOrderDTO {
   customerId: number;
+  vehicleId?: number; // New field
   type: 'walk-in' | 'appointment';
   status: Order['status'];
   date?: string;
@@ -60,9 +63,12 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           *,
           clientes (
             nombre,
-            vehiculo,
-            placa,
             imagen_url
+          ),
+          vehiculos (
+            id,
+            placa,
+            tipo
           ),
           detalle_pedidos (
             id,
@@ -83,7 +89,9 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           customerId: order.cliente_id,
           customerName: order.clientes?.nombre || 'Cliente Desconocido',
           customerImage: order.clientes?.imagen_url,
-          customerVehicle: order.clientes?.vehiculo || '',
+          vehicleId: order.vehiculo_id || order.vehiculos?.id,
+          vehiclePlate: order.vehiculos?.placa,
+          vehicleType: order.vehiculos?.tipo,
           type: order.tipo,
           status: order.estado,
           date: order.fecha_programada,
@@ -139,6 +147,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         .from('pedidos')
         .insert([{
           cliente_id: orderData.customerId,
+          vehiculo_id: orderData.vehicleId || null, // Create with vehicle
           tipo: orderData.type,
           estado: orderData.status,
           fecha_programada: orderData.date || null,
